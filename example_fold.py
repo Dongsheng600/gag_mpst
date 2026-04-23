@@ -67,7 +67,8 @@ Fold = Sort(
         Attribute("nil", Primitive(B))
     ], [
         Attribute("result", Primitive(B))
-    ])
+    ]
+)
 
 FoldPrime = Sort(
     "Fold'", [
@@ -77,7 +78,8 @@ FoldPrime = Sort(
         Attribute("state", Literal("Empty") | Literal("NotEmpty"))
     ], [
         Attribute("result", Primitive(B))
-    ])
+    ]
+)
 
 Take = Sort(
     "Take", [
@@ -86,7 +88,8 @@ Take = Sort(
         Attribute("head", Primitive(A)),
         Attribute("tail", Primitive(list[A])),
         Attribute("state", Literal("Empty") | Literal("NotEmpty"))
-    ])
+    ]
+)
 
 Combine = Sort(
     "Combine", [
@@ -95,24 +98,29 @@ Combine = Sort(
         Attribute("result'", Primitive(B))
     ], [
         Attribute("result", Primitive(B))
-    ])
+    ]
+)
 
 Nil = Sort(
     "Nil", [
         Attribute("nil", Primitive(B))
     ], [
         Attribute("result", Primitive(B))
-    ])
+    ]
+)
+
+# Forms
+FoldForm = Form(Fold, [
+    Attribute("list"),
+    Attribute("cons"),
+    Attribute("nil")
+], [
+    Attribute("result")
+])
 
 # Rules
 FoldRule = Rule(
-    Form(Fold, [
-        Attribute("list"),
-        Attribute("cons"),
-        Attribute("nil")
-    ], [
-        Attribute("result")
-    ]), [
+    FoldForm, [
         Form(FoldPrime, [
             Attribute("list"),
             Attribute("cons"),
@@ -128,7 +136,8 @@ FoldRule = Rule(
             Attribute("tail"),
             Attribute("state")
         ])
-    ])
+    ]
+)
 
 FoldPrimeNotEmptyRule = Rule(
     Form(FoldPrime, [
@@ -161,7 +170,8 @@ FoldPrimeNotEmptyRule = Rule(
         ], [
             Attribute("result")
         ])
-    ])
+    ]
+)
 
 FoldPrimeEmptyRule = Rule(
     Form(FoldPrime, [
@@ -177,4 +187,51 @@ FoldPrimeEmptyRule = Rule(
         ], [
             Attribute("result")
         ])
-    ])
+    ]
+)
+
+TakeRule = Rule(
+    Form(Take, [
+        Attribute("list")
+    ], [
+        Attribute("head"),
+        Attribute("tail"),
+        Attribute("state")
+    ]), []
+)
+
+CombineRule = Rule(
+    Form(Combine, [
+        Attribute("head"),
+        Attribute("cons"),
+        Attribute("result'")
+    ], [
+        Attribute("result")
+    ]), []
+)
+
+NilRule = Rule(
+    Form(Nil, [
+        Attribute("nil")
+    ], [
+        Attribute("result")
+    ]), []
+)
+
+FoldGAG = GAG([
+        Fold,
+        FoldPrime,
+        Take,
+        Combine,
+        Nil
+    ], [
+        FoldForm
+    ], [
+        FoldRule,
+        FoldPrimeNotEmptyRule,
+        FoldPrimeEmptyRule,
+        TakeRule,
+        CombineRule,
+        NilRule
+    ]
+)
