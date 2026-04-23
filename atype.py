@@ -33,7 +33,7 @@ class AttributeType(metaclass=AttributeTypeMeta):
             return True
         return False
 
-    def __lt__(self, other: AttributeType):
+    def __le__(self, other: AttributeType):
         if(isinstance(other, UnionType)):
             return self in other.types
         else:
@@ -77,7 +77,7 @@ class UnionType(AttributeType):
         else:
             return False
     
-    def __lt__(self, other: AttributeType):
+    def __le__(self, other: AttributeType):
         if(isinstance(other, UnionType)):
             return self.types <= other.types
         else:
