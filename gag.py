@@ -10,6 +10,8 @@ class Sort:
         self.name = name
         self.inheritedAttributes = inheritedAttributes
         self.synthesizedAttributes = synthesizedAttributes
+        self.forms = []
+        self.rules = []
 
     def __str__(self):
         return f'{self.name}({", ".join([f"{attr.name}: {attr.type}" for attr in self.inheritedAttributes])})<{", ".join([f"{attr.name}: {attr.type}" for attr in self.synthesizedAttributes])}>'
@@ -19,6 +21,7 @@ class Form:
         self.sort = sort
         self.inheritedAttributes = inheritedAttributes
         self.synthesizedAttributes = synthesizedAttributes
+        sort.forms.append(self)
         # Guards decides which production rule to apply based on the inherited attributes of the form, it must be literal type
         self.guards = {}
         #! Check if the number of attributes matches the sort definition
@@ -35,6 +38,7 @@ class Rule:
     def __init__(self, parent: Form, children: list[Form]):
         self.parent = parent
         self.children = children
+        parent.sort.rules.append(self)
         # Sources and Targets represents the data flow of attributes in the production rule, they are the semantic rules
         # Inherited attributes of the parent or Synthesized attributes of the children, attribute name -> attribute
         self.sources: dict[str, Attribute] = {}
