@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Any
 
 class AttributeTypeMeta(type):
     _types_index = 0
@@ -25,12 +26,15 @@ class AttributeTypeMeta(type):
 
 
 class AttributeType(metaclass=AttributeTypeMeta):
+    def __init__(self):
+        self._index = 0
+
     def __str__(self):
         raise NotImplementedError
 
-    def __eq__(self, value: AttributeType):
-        if(self._index == value._index):
-            return True
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, AttributeType):
+            return self._index == other._index
         return False
 
     def __le__(self, other: AttributeType):
@@ -43,7 +47,7 @@ class AttributeType(metaclass=AttributeTypeMeta):
         return UnionType(self, value)
 
 class PrimitiveType(AttributeType):
-    def __init__(self, t: type):
+    def __init__(self, t: Any):
         self.type = t
     
     def __str__(self):
@@ -71,9 +75,9 @@ class UnionType(AttributeType):
     def __str__(self):
         return ' | '.join(map(str, self.types))
     
-    def __eq__(self, value: AttributeType):
-        if(isinstance(value, UnionType)):
-            return self.types == value.types
+    def __eq__(self, other: object):
+        if(isinstance(other, UnionType)):
+            return self.types == other.types
         else:
             return False
     

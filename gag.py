@@ -4,70 +4,86 @@ class Attribute:
     def __init__(self, name: str, t: AttributeType = Primitive(any)):
         self.name = name
         self.type = t
+    
+    def __repr__(self):
+        if isinstance(self.type, Primitive) and self.type.type == any:
+            return self.name
+        else:
+            return f"{self.name}:{self.type}"
 
 class Sort:
     def __init__(self, name: str, inheritedAttributes: list[Attribute], synthesizedAttributes: list[Attribute]):
         self.name = name
         self.inheritedAttributes = inheritedAttributes
         self.synthesizedAttributes = synthesizedAttributes
-        self.forms = []
-        self.rules = []
+        self.rules: list[Rule] = []
 
-    def __str__(self):
-        return f'{self.name}({", ".join([f"{attr.name}: {attr.type}" for attr in self.inheritedAttributes])})<{", ".join([f"{attr.name}: {attr.type}" for attr in self.synthesizedAttributes])}>'
+    def __repr__(self):
+        return f'{self.name}({", ".join(map(str, self.inheritedAttributes))})<{", ".join(map(str, self.synthesizedAttributes))}>'
 
 class Form:
     def __init__(self, sort: Sort, inheritedAttributes: list[Attribute], synthesizedAttributes: list[Attribute]):
         self.sort = sort
         self.inheritedAttributes = inheritedAttributes
         self.synthesizedAttributes = synthesizedAttributes
-        sort.forms.append(self)
-        # Guards decides which production rule to apply based on the inherited attributes of the form, it must be literal type
-        self.guards = {}
         #! Check if the number of attributes matches the sort definition
         if(len(inheritedAttributes) != len(sort.inheritedAttributes) or len(synthesizedAttributes) != len(sort.synthesizedAttributes)):
             raise ValueError("Number of attributes does not match the sort definition")
+        
+        #! Check if the attribute literal is compatible with the sort definition
         for i in range(len(inheritedAttributes)):
-            if(isinstance(inheritedAttributes[i].type, Literal)):
-                #! Check if the literal value matches the sort definition
-                if (not inheritedAttributes[i].type <= sort.inheritedAttributes[i].type):
-                    raise ValueError("Inherited attribute type does not match the sort definition")
-                self.guards[sort.inheritedAttributes[i].name] = inheritedAttributes[i]
+            # Note: A Literal type is compatible if it's <= the sort's attribute type
+            if isinstance(inheritedAttributes[i].type, Literal) and not (inheritedAttributes[i].type <= sort.inheritedAttributes[i].type):
+                raise ValueError(f"Inherited attribute {inheritedAttributes[i].name} type {inheritedAttributes[i].type} does not match sort definition {sort.inheritedAttributes[i].type}")
+
+    def __repr__(self):
+        return f'{self.sort.name}({", ".join(map(str, self.inheritedAttributes))})<{", ".join(map(str, self.synthesizedAttributes))}>'
 
 class Rule:
     def __init__(self, parent: Form, children: list[Form]):
         self.parent = parent
         self.children = children
         parent.sort.rules.append(self)
-        # Sources and Targets represents the data flow of attributes in the production rule, they are the semantic rules
-        # Inherited attributes of the parent or Synthesized attributes of the children, attribute name -> attribute
-        self.sources: dict[str, Attribute] = {}
-        # Synthesized attributes of the parent or Inherited attributes of the children, attribute name -> attribute
-        self.targets: dict[str, list[Attribute]] = {}
-        self.find_semantic_rules(parent, children)
-        #! Check if the semantic rules are well defined, i.e. each target has a corresponding source
-        for target in self.targets:
-            if target not in self.sources:
-                raise ValueError(f"Target attribute {target} does not have a corresponding source")
+        
+        # Patterns (guards) are defined by Literal-typed inherited attributes in the parent form
+        self.guards: dict[str, Attribute] = {}
+        for i, attr in enumerate(parent.inheritedAttributes):
+            if isinstance(attr.type, Literal):
+                self.guards[parent.sort.inheritedAttributes[i].name] = attr
 
-    def find_semantic_rules(self, parent: Form, children: list[Form]):
-        for attr in parent.inheritedAttributes:
-            self.sources[attr.name] = attr
-        for attr in parent.synthesizedAttributes:
-            if attr.name in self.targets:
-                self.targets[attr.name].append(attr)
-            else:
-                self.targets[attr.name] = [attr]
-        for child in children:
-            for attr in child.synthesizedAttributes:
-                self.sources[attr.name] = attr
-            for attr in child.inheritedAttributes:
-                if attr.name in self.targets:
-                    self.targets[attr.name].append(attr)
-                else:
-                    self.targets[attr.name] = [attr]
+        # Sources and Targets represent the data flow of attributes in the production rule
+        # Sources: Inherited attributes of the parent OR Synthesized attributes of the children
+        self.sources: dict[str, tuple[int, Attribute]] = {} # var -> (child_idx, attr_name)
+        # Targets: Synthesized attributes of the parent OR Inherited attributes of the children
+        self.targets: dict[str, list[tuple[int, Attribute]]] = {}  # var -> List[(child_idx, attr_name)]
 
+        self._map_variables()
 
+    def _map_variables(self):
+        # Parent inherited are sources
+        for i, var in enumerate(self.parent.inheritedAttributes):
+            self.sources[var.name] = (0, self.parent.inheritedAttributes[i])
+        
+        # Parent synthesized are targets
+        for i, var in enumerate(self.parent.synthesizedAttributes):
+            self.targets.setdefault(var.name, []).append((0, self.parent.synthesizedAttributes[i]))
+        # Children
+        for cidx, child in enumerate(self.children, 1):
+            # Child synthesized are sources
+            for i, var in enumerate(child.synthesizedAttributes):
+                self.sources[var.name] = (cidx, child.synthesizedAttributes[i])
+            # Child inherited are targets
+            for i, var in enumerate(child.inheritedAttributes):
+                self.targets.setdefault(var.name, []).append((cidx, child.inheritedAttributes[i]))
+
+        #! Check if each target has a source for non-leaf rules
+        if len(self.children) != 0:
+            for attr_name in self.targets:
+                if attr_name not in self.sources:
+                    raise ValueError(f"Attribute {attr_name} in target position has no source")
+        
+    def __repr__(self):
+        return f'{self.parent} -> {", ".join(map(str, self.children))}'
 
 class GAG:
     def __init__(self, sorts: list[Sort], interfaces: list[Form], rules: list[Rule]):

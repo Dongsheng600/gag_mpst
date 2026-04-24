@@ -1,9 +1,6 @@
 from atype import *
 from gag import *
-from typing import TypeVar, Callable
-
-A = TypeVar('A')
-B = TypeVar('B')
+from typing import Callable
 
 '''
 sort Fold(
@@ -62,50 +59,50 @@ Fold'(list, cons, nil, "Empty")<result> <-
 # Sorts
 Fold = Sort(
     "Fold", [
-        Attribute("list", Primitive(list[A])),
-        Attribute("cons", Primitive(Callable[[A, B], B])),
-        Attribute("nil", Primitive(B))
+        Attribute("list", Primitive(list[int])),
+        Attribute("cons", Primitive(Callable[[int, int], int])),
+        Attribute("nil", Primitive(int))
     ], [
-        Attribute("result", Primitive(B))
+        Attribute("result", Primitive(int))
     ]
 )
 
 FoldPrime = Sort(
     "Fold'", [
-        Attribute("list", Primitive(list[A])),
-        Attribute("cons", Primitive(Callable[[A, B], B])),
-        Attribute("nil", Primitive(B)),
+        Attribute("list", Primitive(list[int])),
+        Attribute("cons", Primitive(Callable[[int, int], int])),
+        Attribute("nil", Primitive(int)),
         Attribute("state", Literal("Empty") | Literal("NotEmpty"))
     ], [
-        Attribute("result", Primitive(B))
+        Attribute("result", Primitive(int))
     ]
 )
 
 Take = Sort(
     "Take", [
-        Attribute("list", Primitive(list[A]))
+        Attribute("list", Primitive(list[int]))
     ], [
-        Attribute("head", Primitive(A)),
-        Attribute("tail", Primitive(list[A])),
+        Attribute("head", Primitive(int)),
+        Attribute("tail", Primitive(list[int])),
         Attribute("state", Literal("Empty") | Literal("NotEmpty"))
     ]
 )
 
 Combine = Sort(
     "Combine", [
-        Attribute("head", Primitive(A)),
-        Attribute("cons", Primitive(Callable[[A, B], B])),
-        Attribute("result'", Primitive(B))
+        Attribute("head", Primitive(int)),
+        Attribute("cons", Primitive(Callable[[int, int], int])),
+        Attribute("result'", Primitive(int))
     ], [
-        Attribute("result", Primitive(B))
+        Attribute("result", Primitive(int))
     ]
 )
 
 Nil = Sort(
     "Nil", [
-        Attribute("nil", Primitive(B))
+        Attribute("nil", Primitive(int))
     ], [
-        Attribute("result", Primitive(B))
+        Attribute("result", Primitive(int))
     ]
 )
 
