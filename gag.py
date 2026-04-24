@@ -83,7 +83,7 @@ class Rule:
                     raise ValueError(f"Attribute {attr_name} in target position has no source")
         
     def __repr__(self):
-        return f'{self.parent} -> {", ".join(map(str, self.children))}'
+        return f'{self.parent} <- {", ".join(map(str, self.children))}'
 
 class GAG:
     def __init__(self, sorts: list[Sort], interfaces: list[Form], rules: list[Rule]):
