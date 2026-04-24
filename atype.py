@@ -63,11 +63,11 @@ class UnionType(AttributeType):
     def __init__(self, type1: AttributeType, type2: AttributeType):
         self.types = set()
         if(isinstance(type1, UnionType)):
-            self.types = self.types.union(type1.types)
+            self.types.update(type1.types)
         else:
             self.types.add(type1)
         if(isinstance(type2, UnionType)):
-            self.types = self.types.union(type2.types)
+            self.types.update(type2.types)
         else:
             self.types.add(type2)
     
