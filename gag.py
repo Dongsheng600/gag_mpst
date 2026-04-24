@@ -1,62 +1,66 @@
+from __future__ import annotations
 from atype import *
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Tuple
 
+@dataclass(frozen=True)
 class Attribute:
-    def __init__(self, name: str, t: AttributeType = Primitive(any)):
-        self.name = name
-        self.type = t
+    name: str
+    type: AttributeType = Primitive(Any)
     
     def __repr__(self):
-        if isinstance(self.type, Primitive) and self.type.type == any:
+        if isinstance(self.type, Primitive) and self.type.type == Any:
             return self.name
         else:
             return f"{self.name}:{self.type}"
 
+@dataclass
 class Sort:
-    def __init__(self, name: str, inheritedAttributes: list[Attribute], synthesizedAttributes: list[Attribute]):
-        self.name = name
-        self.inheritedAttributes = inheritedAttributes
-        self.synthesizedAttributes = synthesizedAttributes
-        self.rules: list[Rule] = []
+    name: str
+    inheritedAttributes: List[Attribute]
+    synthesizedAttributes: List[Attribute]
+    rules: List[Rule] = field(default_factory=list)
 
     def __repr__(self):
         return f'{self.name}({", ".join(map(str, self.inheritedAttributes))})<{", ".join(map(str, self.synthesizedAttributes))}>'
 
+@dataclass
 class Form:
-    def __init__(self, sort: Sort, inheritedAttributes: list[Attribute], synthesizedAttributes: list[Attribute]):
-        self.sort = sort
-        self.inheritedAttributes = inheritedAttributes
-        self.synthesizedAttributes = synthesizedAttributes
+    sort: Sort
+    inheritedAttributes: List[Attribute]
+    synthesizedAttributes: List[Attribute]
+    
+    def __post_init__(self):
         #! Check if the number of attributes matches the sort definition
-        if(len(inheritedAttributes) != len(sort.inheritedAttributes) or len(synthesizedAttributes) != len(sort.synthesizedAttributes)):
+        if(len(self.inheritedAttributes) != len(self.sort.inheritedAttributes) or len(self.synthesizedAttributes) != len(self.sort.synthesizedAttributes)):
             raise ValueError("Number of attributes does not match the sort definition")
         
         #! Check if the attribute literal is compatible with the sort definition
-        for i in range(len(inheritedAttributes)):
+        for i in range(len(self.inheritedAttributes)):
             # Note: A Literal type is compatible if it's <= the sort's attribute type
-            if isinstance(inheritedAttributes[i].type, Literal) and not (inheritedAttributes[i].type <= sort.inheritedAttributes[i].type):
-                raise ValueError(f"Inherited attribute {inheritedAttributes[i].name} type {inheritedAttributes[i].type} does not match sort definition {sort.inheritedAttributes[i].type}")
+            if isinstance(self.inheritedAttributes[i].type, Literal) and not (self.inheritedAttributes[i].type <= self.sort.inheritedAttributes[i].type):
+                raise ValueError(f"Inherited attribute {self.inheritedAttributes[i].name} type {self.inheritedAttributes[i].type} does not match sort definition {self.sort.inheritedAttributes[i].type}")
 
     def __repr__(self):
         return f'{self.sort.name}({", ".join(map(str, self.inheritedAttributes))})<{", ".join(map(str, self.synthesizedAttributes))}>'
 
+@dataclass
 class Rule:
-    def __init__(self, parent: Form, children: list[Form]):
-        self.parent = parent
-        self.children = children
-        parent.sort.rules.append(self)
-        
-        # Patterns (guards) are defined by Literal-typed inherited attributes in the parent form
-        self.guards: dict[str, Attribute] = {}
-        for i, attr in enumerate(parent.inheritedAttributes):
+    parent: Form
+    children: List[Form]
+    # Sources and Targets represent the data flow of attributes in the production rule
+    # Sources: Inherited attributes of the parent OR Synthesized attributes of the children
+    sources: Dict[str, Tuple[int, Attribute]] = field(default_factory=dict)  # var -> (child_idx, attr_name)
+    # Targets: Synthesized attributes of the parent OR Inherited attributes of the children
+    targets: Dict[str, List[Tuple[int, Attribute]]] = field(default_factory=dict)  # var -> List[(child_idx, attr_name)]
+    # Patterns (guards) are defined by Literal-typed inherited attributes in the parent form
+    guards: Dict[str, Attribute] = field(default_factory=dict)
+
+    def __post_init__(self):
+        self.parent.sort.rules.append(self)
+        for i, attr in enumerate(self.parent.inheritedAttributes):
             if isinstance(attr.type, Literal):
-                self.guards[parent.sort.inheritedAttributes[i].name] = attr
-
-        # Sources and Targets represent the data flow of attributes in the production rule
-        # Sources: Inherited attributes of the parent OR Synthesized attributes of the children
-        self.sources: dict[str, tuple[int, Attribute]] = {} # var -> (child_idx, attr_name)
-        # Targets: Synthesized attributes of the parent OR Inherited attributes of the children
-        self.targets: dict[str, list[tuple[int, Attribute]]] = {}  # var -> List[(child_idx, attr_name)]
-
+                self.guards[self.parent.sort.inheritedAttributes[i].name] = attr
         self._map_variables()
 
     def _map_variables(self):
@@ -85,8 +89,9 @@ class Rule:
     def __repr__(self):
         return f'{self.parent} <- {", ".join(map(str, self.children))}'
 
+@dataclass(frozen=True)
 class GAG:
-    def __init__(self, sorts: list[Sort], interfaces: list[Form], rules: list[Rule]):
-        self.sorts = sorts
-        self.interfaces = interfaces
-        self.rules = rules
+    sorts: List[Sort]
+    interfaces: List[Form]
+    rules: List[Rule]
+

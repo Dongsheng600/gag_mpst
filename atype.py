@@ -1,4 +1,5 @@
 from __future__ import annotations
+from dataclasses import dataclass
 from typing import Any
 
 class AttributeTypeMeta(type):
@@ -24,12 +25,10 @@ class AttributeTypeMeta(type):
         cls._types_index += 1
         return instance
 
-
+@dataclass
 class AttributeType(metaclass=AttributeTypeMeta):
-    def __init__(self):
-        self._index = 0
-
-    def __str__(self):
+    _index = 0
+    def __repr__(self):
         raise NotImplementedError
 
     def __eq__(self, other: object) -> bool:
@@ -46,19 +45,19 @@ class AttributeType(metaclass=AttributeTypeMeta):
     def __or__(self, value: AttributeType):
         return UnionType(self, value)
 
+
+@dataclass
 class PrimitiveType(AttributeType):
-    def __init__(self, t: Any):
-        self.type = t
-    
-    def __str__(self):
+    type: Any
+    def __repr__(self):
         return str(self.type)
 
+@dataclass
 class LiteralType(AttributeType):
-    def __init__(self, literal: str):
-        self.literal = literal
-
-    def __str__(self):
+    literal: str
+    def __repr__(self):
         return f'"{self.literal}"'
+
 
 class UnionType(AttributeType):
     def __init__(self, type1: AttributeType, type2: AttributeType):
@@ -72,7 +71,7 @@ class UnionType(AttributeType):
         else:
             self.types.add(type2)
     
-    def __str__(self):
+    def __repr__(self):
         return ' | '.join(map(str, self.types))
     
     def __eq__(self, other: object):
