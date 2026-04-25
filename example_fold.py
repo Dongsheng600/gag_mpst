@@ -1,6 +1,6 @@
 from atype import *
 from gag import *
-from typing import Callable
+from typing import Callable, List
 
 '''
 sort Fold(
@@ -59,7 +59,7 @@ Fold'(list, cons, nil, "Empty")<result> <-
 # Sorts
 Fold = Sort(
     "Fold", [
-        Attribute("list", Primitive(list[int])),
+        Attribute("list", Primitive(List[int])),
         Attribute("cons", Primitive(Callable[[int, int], int])),
         Attribute("nil", Primitive(int))
     ], [
@@ -69,7 +69,7 @@ Fold = Sort(
 
 FoldPrime = Sort(
     "Fold'", [
-        Attribute("list", Primitive(list[int])),
+        Attribute("list", Primitive(List[int])),
         Attribute("cons", Primitive(Callable[[int, int], int])),
         Attribute("nil", Primitive(int)),
         Attribute("state", Literal("Empty") | Literal("NotEmpty"))
@@ -80,10 +80,10 @@ FoldPrime = Sort(
 
 Take = Sort(
     "Take", [
-        Attribute("list", Primitive(list[int]))
+        Attribute("list", Primitive(List[int]))
     ], [
         Attribute("head", Primitive(int)),
-        Attribute("tail", Primitive(list[int])),
+        Attribute("tail", Primitive(List[int])),
         Attribute("state", Literal("Empty") | Literal("NotEmpty"))
     ]
 )

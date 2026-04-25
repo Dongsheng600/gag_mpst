@@ -1,4 +1,5 @@
 from gag import GAG
+from typing import Tuple, Set, Dict
 
 class IsStrongAcyclic:
     def __init__(self, gag: GAG):
@@ -14,7 +15,7 @@ class IsStrongAcyclic:
         dependencies within each sort) has no cycles.
         """
         # R[sort_name] = set of (inh_attr_pos, syn_attr_pos) representing possible dependencies of a sort
-        R: dict[str, set[tuple[int, int]]] = {sort.name: set() for sort in self.sorts}
+        R: Dict[str, Set[Tuple[int, int]]] = {sort.name: set() for sort in self.sorts}
         
         changed = True
         while changed:
@@ -22,7 +23,7 @@ class IsStrongAcyclic:
             for rule in self.rules:
                 # Build a dependency graph for this rule
                 # Nodes are (child_idx, attr_name). 0 is parent.
-                adj: dict[tuple[int, str], set[tuple[int, str]]]= {}
+                adj: Dict[Tuple[int, str], Set[Tuple[int, str]]]= {}
                 parent = rule.parent
                 
                 # Edges from semantic rules (variable sharing)
@@ -67,7 +68,7 @@ class IsStrongAcyclic:
         # print("R:", R)
         return True
 
-    def _has_cycle(self, adj: dict[tuple[int, str], set[tuple[int, str]]]) -> bool:
+    def _has_cycle(self, adj: Dict[Tuple[int, str], set[Tuple[int, str]]]) -> bool:
         visited = set()
         stack = set()
         
@@ -86,7 +87,7 @@ class IsStrongAcyclic:
                 if visit(node): return True
         return False
 
-    def _has_path(self, adj: dict[tuple[int, str], set[tuple[int, str]]], start: tuple[int, str], end: tuple[int, str]) -> bool:
+    def _has_path(self, adj: Dict[Tuple[int, str], Set[Tuple[int, str]]], start: Tuple[int, str], end: Tuple[int, str]) -> bool:
         if start == end: return True
         visited = set()
         queue = [start] 
