@@ -68,7 +68,8 @@ class IsStrongAcyclic:
         # print("R:", R)
         return True
 
-    def _has_cycle(self, adj: Dict[Tuple[int, str], set[Tuple[int, str]]]) -> bool:
+    @staticmethod
+    def _has_cycle(adj: Dict[Tuple[int, str], set[Tuple[int, str]]]) -> bool:
         visited = set()
         stack = set()
         
@@ -87,7 +88,8 @@ class IsStrongAcyclic:
                 if visit(node): return True
         return False
 
-    def _has_path(self, adj: Dict[Tuple[int, str], Set[Tuple[int, str]]], start: Tuple[int, str], end: Tuple[int, str]) -> bool:
+    @staticmethod
+    def _has_path(adj: Dict[Tuple[int, str], Set[Tuple[int, str]]], start: Tuple[int, str], end: Tuple[int, str]) -> bool:
         if start == end: return True
         visited = set()
         queue = [start] 
