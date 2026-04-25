@@ -1,5 +1,5 @@
-from atype import *
-from gag import *
+from safe.gag.atype import *
+from safe.gag.base import *
 
 '''
 Example of a GAG that is NOT strongly acyclic but is SAFE.

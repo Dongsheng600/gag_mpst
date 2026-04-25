@@ -1,7 +1,7 @@
-from gag import GAG
+from safe.gag.base import GAG
 from typing import Tuple, Set, Dict
 
-class IsStrongAcyclic:
+class StrongAcyclicChecker:
     def __init__(self, gag: GAG):
         self.gag = gag
         self.sorts = gag.sorts

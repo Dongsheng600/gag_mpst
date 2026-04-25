@@ -1,5 +1,5 @@
-from atype import *
-from gag import *
+from safe.gag.atype import *
+from safe.gag.base import *
 from typing import Callable, List
 
 '''
