@@ -3,11 +3,10 @@ from dataclasses import dataclass
 from typing import Any
 
 class AttributeTypeMeta(type):
-    _types_index = 0
     _all_types = {}
     
     def __new__(mcs, name, bases, attrs):
-        attrs['__hash__'] = lambda self: self._index
+        attrs['__hash__'] = lambda self: id(self)
         return super().__new__(mcs, name, bases, attrs)
 
     def __call__(cls, *args, **kwargs):
@@ -20,20 +19,17 @@ class AttributeTypeMeta(type):
             cls._all_types[value] = instance
         else:
             instance = super().__call__(*args, **kwargs)
-        #! Assign a unique index to each type for comparison purposes
-        instance._index = cls._types_index
-        cls._types_index += 1
         return instance
 
 @dataclass
 class AttributeType(metaclass=AttributeTypeMeta):
-    _index = 0
+    # _index = 0
     def __repr__(self):
         raise NotImplementedError
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, AttributeType):
-            return self._index == other._index
+            return id(self) == id(other)
         return False
 
     def __le__(self, other: AttributeType):
