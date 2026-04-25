@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Any, List, Tuple, Set, Dict
 from safe.mpst.base import (
     GlobalGraph, Node, InputLabel, OutputLabel, 
-    BranchingLabel, SelectionLabel, LabelOutputLabel
+    BranchingLabel, SelectionLabel, LabelOutputLabel, Channel
 )
 
 class CoherenceChecker:
@@ -17,8 +17,8 @@ class CoherenceChecker:
 
     def is_well_directed(self) -> bool:
         """Static check: each channel must have exactly one sender and one receiver."""
-        senders: Dict[int, str] = {}
-        receivers: Dict[int, str] = {}
+        senders: Dict[Channel, str] = {}
+        receivers: Dict[Channel, str] = {}
         for p, local in self.graph.components.items():
             for node in local.nodes:
                 ch, is_send = None, False
@@ -48,7 +48,6 @@ class CoherenceChecker:
                 for node_set in node.successors.values():
                     targets.update(node_set)
             initial_state[p] = frozenset(n for n in local.nodes if n not in targets)
-            
         return self._explore(initial_state, set())
 
     def _get_state_key(self, state: Dict[str, frozenset[Node]]) -> Tuple:
@@ -61,8 +60,8 @@ class CoherenceChecker:
         visited.add(state_key)
 
         # 1. Linearity Check
-        active_senders: Dict[int, str] = {}
-        active_receivers: Dict[int, str] = {}
+        active_senders: Dict[Channel, str] = {}
+        active_receivers: Dict[Channel, str] = {}
         all_active = []
         for p, nodes in state.items():
             for node in nodes:

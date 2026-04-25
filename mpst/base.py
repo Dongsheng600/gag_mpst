@@ -15,41 +15,48 @@ Payloads (U) now use the AttributeType system from atype.py.
 # Graph-based Types (Section 4)
 # =============================================================================
 
+@dataclass(frozen=True)
+class Channel:
+    name: str
+
+    def __repr__(self) -> str:
+        return self.name
+
 class ActionLabel:
     """Base class for node labels in local graphs."""
     pass
 
 @dataclass(frozen=True)
 class InputLabel(ActionLabel):
-    channel: int
+    channel: Channel
     payload: AttributeType
     def __repr__(self):
         return f"{self.channel}?<{self.payload}>"
 
 @dataclass(frozen=True)
 class OutputLabel(ActionLabel):
-    channel: int
+    channel: Channel
     payload: AttributeType
     def __repr__(self):
         return f"{self.channel}!<{self.payload}>"
 
 @dataclass(frozen=True)
 class BranchingLabel(ActionLabel):
-    channel: int
+    channel: Channel
     labels: List[str]
     def __repr__(self):
         return f"{self.channel}&{{{','.join(self.labels)}}}"
 
 @dataclass(frozen=True)
 class SelectionLabel(ActionLabel):
-    channel: int
+    channel: Channel
     labels: List[str]
     def __repr__(self):
         return f"{self.channel}+{{{','.join(self.labels)}}}"
 
 @dataclass(frozen=True)
 class LabelOutputLabel(ActionLabel):
-    channel: int
+    channel: Channel
     label: str
     def __repr__(self):
         return f"{self.channel}+{self.label}"
