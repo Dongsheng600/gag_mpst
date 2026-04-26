@@ -19,7 +19,9 @@ class Sort:
     name: str
     inheritedAttributes: List[Attribute]
     synthesizedAttributes: List[Attribute]
-    rules: List[Rule] = field(default_factory=list)
+    parent_rules: List[Rule] = field(default_factory=list)
+    child_rules: List[Rule] = field(default_factory=list)
+    
 
     def __repr__(self):
         return f'{self.name}({", ".join(map(str, self.inheritedAttributes))})<{", ".join(map(str, self.synthesizedAttributes))}>'
@@ -57,10 +59,12 @@ class Rule:
     guards: Dict[str, Attribute] = field(default_factory=dict)
 
     def __post_init__(self):
-        self.parent.sort.rules.append(self)
+        self.parent.sort.parent_rules.append(self)
         for i, attr in enumerate(self.parent.inheritedAttributes):
             if isinstance(attr.type, Literal):
                 self.guards[self.parent.sort.inheritedAttributes[i].name] = attr
+        for child in self.children:
+            child.sort.child_rules.append(self)
         self._map_variables()
 
     def _map_variables(self):
