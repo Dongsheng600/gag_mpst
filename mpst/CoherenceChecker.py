@@ -2,7 +2,8 @@ from __future__ import annotations
 from typing import Any, List, Tuple, Set, Dict, Optional, cast, Union
 from safe.mpst.base import (
     GlobalGraph, Node, ActionLabel, InputLabel, OutputLabel, 
-    BranchingLabel, SelectionLabel, LabelOutputLabel, Channel
+    BranchingLabel, SelectionLabel, LabelOutputLabel, Channel,
+    CommunicationEdge
 )
 
 # Type alias for actions that have a channel attribute
@@ -18,6 +19,8 @@ class CoherenceChecker:
         self.verbose = verbose
         # Cache for virtual LabelOutput nodes created during Selection expansion
         self._lo_cache: Dict[Tuple[int, str], Node] = {}
+        # Track original selection node for virtual label output nodes
+        self._lo_parents: Dict[int, Node] = {}
 
     def is_well_directed(self) -> bool:
         """Static check for sender/receiver consistency."""
@@ -57,6 +60,8 @@ class CoherenceChecker:
     def check_coherence(self) -> bool:
         if not self.is_well_directed():
             return False
+        
+        self.graph.communication_edges.clear()
         
         # State is the set of nodes on the graph per participant
         initial_state = {p: frozenset(local.nodes) for p, local in self.graph.components.items()}
@@ -160,12 +165,15 @@ class CoherenceChecker:
         if ar.channel != as_.channel: return None
 
         if isinstance(ar, InputLabel) and isinstance(as_, OutputLabel) and as_.payload <= ar.payload:
+            self.graph.communication_edges.add(CommunicationEdge(ns, ps, nr, pr))
             new_state = state.copy()
             new_state[pr] = new_state[pr] - {nr}
             new_state[ps] = new_state[ps] - {ns}
             return new_state, f"{ps}->{pr}:{ar.channel.name}"
 
         if isinstance(ar, BranchingLabel) and isinstance(as_, LabelOutputLabel) and as_.label in ar.labels:
+            source = self._lo_parents.get(id(ns), ns)
+            self.graph.communication_edges.add(CommunicationEdge(source, ps, nr, pr))
             new_state = state.copy()
             garbage = self._get_branch_garbage(nr, as_.label, state[pr])
             new_state[pr] = state[pr] - {nr} - garbage
@@ -194,6 +202,7 @@ class CoherenceChecker:
         return reachable
 
     def _get_lo_node(self, selection_node: Node, label: str) -> Node:
+        """Creates/retrieves a virtual LabelOutput node from a Selection node and label."""
         key = (id(selection_node), label)
         if key not in self._lo_cache:
             action = selection_node.action
@@ -206,4 +215,5 @@ class CoherenceChecker:
                 for succ in selection_node.successors[label]:
                     new_node.add_edge(succ)
             self._lo_cache[key] = new_node
+            self._lo_parents[id(new_node)] = selection_node
         return self._lo_cache[key]
