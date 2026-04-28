@@ -156,9 +156,8 @@ class GAGToMPSTConverter:
             if src_info and src_info[0] == 0: 
                 initial_actions.append(node)
         
-        if not dist_nodes:
-            for node in coll_nodes.values():
-                initial_actions.append(node)
+        for node in coll_nodes.values():
+            initial_actions.append(node)
 
         return {
             "dist_nodes": dist_nodes,
