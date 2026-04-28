@@ -22,32 +22,30 @@ class StrongAcyclicChecker:
             changed = False
             for rule in self.rules:
                 # Build a dependency graph for this rule
-                # Nodes are (child_idx, attr_name). 0 is parent.
-                adj: Dict[Tuple[int, str], Set[Tuple[int, str]]]= {}
+                # Nodes are (child_idx, inh_or_syn, attr_idx). 0 is parent. 0 for inherited attributes
+                adj: Dict[Tuple[int, int, int], Set[Tuple[int, int, int]]]= {}
                 parent = rule.parent
                 
                 # Edges from semantic rules (variable sharing)
                 if len(rule.children) == 0:
                     # Leaf rule: only consider parent inherited to synthesized
                     # Use virtual attribute to simplify the graph
-                    virtual_attr = (0, "virtual")
+                    virtual_attr = (0, -1, -1)
                     for inh_pos, inh_attr in enumerate(parent.inheritedAttributes):
-                        adj.setdefault((0, inh_attr.name), set()).add(virtual_attr)
+                        adj.setdefault((0, 0, inh_pos), set()).add(virtual_attr)
                     for syn_pos, syn_attr in enumerate(parent.synthesizedAttributes):
-                        adj.setdefault(virtual_attr, set()).add((0, syn_attr.name))
+                        adj.setdefault(virtual_attr, set()).add((0, 1, syn_pos))
                 else:
-                    for var, target_locs in rule.targets.items():
-                        source_loc = rule.sources[var]
-                        src_node = (source_loc[0], source_loc[1].name)
-                        for tgt_loc in target_locs:
-                            adj.setdefault(src_node, set()).add((tgt_loc[0], tgt_loc[1].name))
+                    for var, targets in rule.targets.items():
+                        (sc_idx, sattr_idx) = rule.sources[var]
+                        src_node = (sc_idx, 0 if sc_idx == 0 else 1, sattr_idx)
+                        for tc_idx, tattr_idx in targets:
+                            adj.setdefault(src_node, set()).add((tc_idx, 1 if tc_idx == 0 else 0, tattr_idx))
 
                 # Edges from R for each child
                 for c_idx, child in enumerate(rule.children, 1):
                     for inh_pos, syn_pos in R[child.sort.name]:
-                        src_node = (c_idx, child.inheritedAttributes[inh_pos].name)
-                        tgt_node = (c_idx, child.synthesizedAttributes[syn_pos].name)
-                        adj.setdefault(src_node, set()).add(tgt_node)
+                        adj.setdefault((c_idx, 0, inh_pos), set()).add((c_idx, 1, syn_pos))
                 
                 # Check for cycles in this local graph
                 if self._has_cycle(adj):
@@ -62,14 +60,14 @@ class StrongAcyclicChecker:
                 for inh_pos, inh_attr in enumerate(parent.inheritedAttributes):
                     for syn_pos, syn_attr in enumerate(parent.synthesizedAttributes):
                         if (inh_pos, syn_pos) not in R[lhs_sort.name]:
-                            if self._has_path(adj, (0, inh_attr.name), (0, syn_attr.name)):
+                            if self._has_path(adj, (0, 0, inh_pos), (0, 1, syn_pos)):
                                 R[lhs_sort.name].add((inh_pos, syn_pos))
                                 changed = True
         # print("R:", R)
         return True
 
     @staticmethod
-    def _has_cycle(adj: Dict[Tuple[int, str], set[Tuple[int, str]]]) -> bool:
+    def _has_cycle(adj: Dict[Tuple[int, int, int], set[Tuple[int, int, int]]]) -> bool:
         visited = set()
         stack = set()
         
@@ -89,7 +87,7 @@ class StrongAcyclicChecker:
         return False
 
     @staticmethod
-    def _has_path(adj: Dict[Tuple[int, str], Set[Tuple[int, str]]], start: Tuple[int, str], end: Tuple[int, str]) -> bool:
+    def _has_path(adj: Dict[Tuple[int, int, int], Set[Tuple[int, int, int]]], start: Tuple[int, int, int], end: Tuple[int, int, int]) -> bool:
         if start == end: return True
         visited = set()
         queue = [start] 
