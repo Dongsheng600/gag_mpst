@@ -149,7 +149,7 @@ FoldPrimeNotEmptyRule = Rule(
             Attribute("tail"),
             Attribute("cons"),
             Attribute("nil"),
-            Attribute("state")
+            Attribute("state'")
         ], [
             Attribute("result'")
         ]),
@@ -158,7 +158,7 @@ FoldPrimeNotEmptyRule = Rule(
         ], [
             Attribute("head"),
             Attribute("tail"),
-            Attribute("state")
+            Attribute("state'")
         ]),
         Form(Combine, [
             Attribute("head"),
