@@ -21,7 +21,6 @@ class AttributeTypeMeta(type):
             instance = super().__call__(*args, **kwargs)
         return instance
 
-@dataclass
 class AttributeType(metaclass=AttributeTypeMeta):
     # _index = 0
     def __repr__(self):
@@ -35,6 +34,8 @@ class AttributeType(metaclass=AttributeTypeMeta):
     def __le__(self, other: AttributeType):
         if(isinstance(other, UnionType)):
             return self in other.types
+        elif(isinstance(other, PrimitiveType) and (other.type == Any or other.type == any)):
+            return True
         else:
             return self.__eq__(other)
 
@@ -42,13 +43,13 @@ class AttributeType(metaclass=AttributeTypeMeta):
         return UnionType(self, value)
 
 
-@dataclass
+@dataclass(eq=False)
 class PrimitiveType(AttributeType):
     type: Any
     def __repr__(self):
         return str(self.type)
 
-@dataclass
+@dataclass(eq=False)
 class LiteralType(AttributeType):
     literal: str
     def __repr__(self):
@@ -77,7 +78,9 @@ class UnionType(AttributeType):
             return False
     
     def __le__(self, other: AttributeType):
-        if(isinstance(other, UnionType)):
+        if(isinstance(other, PrimitiveType) and other.type == Any):
+            return True
+        elif(isinstance(other, UnionType)):
             return self.types <= other.types
         else:
             return False
