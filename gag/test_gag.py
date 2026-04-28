@@ -136,5 +136,53 @@ class TestGAGValidation(unittest.TestCase):
             Form(sort_a, [Attribute("x")], [Attribute("x")])
         self.assertIn("overlapping inherited and synthesized variable names", str(cm.exception))
 
+class TestExternalService(unittest.TestCase):
+    def test_external_sort_defaults(self):
+        inh = [Attribute("p1"), Attribute("p2")]
+        syn = [Attribute("u1")]
+        ext_sort = Sort("Ext", inh, syn, is_external=True)
+        
+        self.assertTrue(ext_sort.is_external)
+        # Default: all outputs depend on all inputs
+        self.assertEqual(ext_sort.local_dependency, {(0, 0), (1, 0)})
+        self.assertEqual(repr(ext_sort), "@Ext(p1, p2)<u1>")
+        
+        form = Form(ext_sort, [Attribute("x"), Attribute("y")], [Attribute("z")])
+        self.assertEqual(repr(form), "@Ext(x, y)<z>")
+
+    def test_external_sort_custom_dependency(self):
+        inh = [Attribute("p1"), Attribute("p2")]
+        syn = [Attribute("u1"), Attribute("u2")]
+        # u1 depends on p1, u2 depends on p2
+        ext_sort = Sort("Ext", inh, syn, is_external=True, local_dependency={(0, 0), (1, 1)})
+        self.assertEqual(ext_sort.local_dependency, {(0, 0), (1, 1)})
+
+    def test_external_parent_fails(self):
+        ext_sort = Sort("Ext", [Attribute("p")], [Attribute("u")], is_external=True)
+        form = Form(ext_sort, [Attribute("p")], [Attribute("u")])
+        with self.assertRaises(ValueError) as cm:
+            Rule(form, [])
+        self.assertIn("cannot be a parent", str(cm.exception))
+
+    def test_external_dependency_propagation(self):
+        # Sort A(p)<u1, u2>
+        # Rule: A(p)<u1, u2> <- @Ext1(p)<u1> @Ext2(p)<u2>
+        sort_a = Sort("A", [Attribute("p")], [Attribute("u1"), Attribute("u2")])
+        ext_s1 = Sort("Ext1", [Attribute("p")], [Attribute("u1")], is_external=True)
+        ext_s2 = Sort("Ext2", [Attribute("p")], [Attribute("u2")], is_external=True)
+        
+        f_a = Form(sort_a, [Attribute("p")], [Attribute("u1"), Attribute("u2")])
+        f_e1 = Form(ext_s1, [Attribute("p")], [Attribute("u1")])
+        f_e2 = Form(ext_s2, [Attribute("p")], [Attribute("u2")])
+        
+        rule = Rule(f_a, [f_e1, f_e2])
+        # The GAG initialization triggers _compute_effective_dependencies
+        GAG([sort_a, ext_s1, ext_s2], [f_a], [rule])
+        
+        # Check if dependencies (p -> u1) and (p -> u2) are propagated to A
+        # inh_idx 0 is 'p', syn_idx 0 is 'u1', syn_idx 1 is 'u2'
+        self.assertIn((0, 0), rule.dependency_graph)
+        self.assertIn((0, 1), rule.dependency_graph)
+
 if __name__ == '__main__':
     unittest.main()

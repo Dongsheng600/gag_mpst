@@ -1,7 +1,7 @@
 from __future__ import annotations
 from safe.gag.atype import *
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Tuple, Set
+from typing import Any, Dict, List, Tuple, Set, Optional
 
 @dataclass(frozen=True)
 class Attribute:
@@ -19,6 +19,8 @@ class Sort:
     name: str
     inheritedAttributes: List[Attribute]
     synthesizedAttributes: List[Attribute]
+    is_external: bool = False
+    local_dependency: Optional[Set[Tuple[int, int]]] = None
     parent_rules: List[Rule] = field(default_factory=list)
     child_rules: List[Rule] = field(default_factory=list)
     
@@ -28,9 +30,17 @@ class Sort:
         overlap = inh_names & syn_names
         if overlap:
             raise ValueError(f"Sort {self.name} has overlapping inherited and synthesized attribute names: {overlap}")
+        
+        if self.is_external and self.local_dependency is None:
+            # Default conservative dependency: all outputs depend on all inputs
+            self.local_dependency = set()
+            for inh_idx in range(len(self.inheritedAttributes)):
+                for syn_idx in range(len(self.synthesizedAttributes)):
+                    self.local_dependency.add((inh_idx, syn_idx))
 
     def __repr__(self):
-        return f'{self.name}({", ".join(map(str, self.inheritedAttributes))})<{", ".join(map(str, self.synthesizedAttributes))}>'
+        prefix = "@" if self.is_external else ""
+        return f'{prefix}{self.name}({", ".join(map(str, self.inheritedAttributes))})<{", ".join(map(str, self.synthesizedAttributes))}>'
 
 @dataclass
 class Form:
@@ -57,7 +67,8 @@ class Form:
                 raise ValueError(f"Inherited attribute {self.inheritedAttributes[i].name} type {self.inheritedAttributes[i].type} does not match sort definition {self.sort.inheritedAttributes[i].type}")
 
     def __repr__(self):
-        return f'{self.sort.name}({", ".join(map(str, self.inheritedAttributes))})<{", ".join(map(str, self.synthesizedAttributes))}>'
+        prefix = "@" if self.sort.is_external else ""
+        return f'{prefix}{self.sort.name}({", ".join(map(str, self.inheritedAttributes))})<{", ".join(map(str, self.synthesizedAttributes))}>'
 
 @dataclass
 class Rule:
@@ -79,6 +90,8 @@ class Rule:
 
 
     def __post_init__(self):
+        if self.parent.sort.is_external:
+            raise ValueError(f"External sort {self.parent.sort.name} cannot be a parent in a production rule")
         self.parent.sort.parent_rules.append(self)
         for i, attr in enumerate(self.parent.inheritedAttributes):
             if isinstance(attr.type, Literal):
@@ -212,10 +225,14 @@ class GAG:
 
                 # Effective dependency contribution from children
                 for c_idx, child in enumerate(rule.children, 1):
-                    reachable = rule.reachable_rules(c_idx)
                     effective_dep: Set[Tuple[int, int]] = set()
-                    for r_child in reachable:
-                        effective_dep.update(r_child.dependency_graph)
+                    if child.sort.is_external:
+                        if child.sort.local_dependency:
+                            effective_dep.update(child.sort.local_dependency)
+                    else:
+                        reachable = rule.reachable_rules(c_idx)
+                        for r_child in reachable:
+                            effective_dep.update(r_child.dependency_graph)
                     
                     for inh_idx, syn_idx in effective_dep:
                         adj.setdefault((c_idx, 0, inh_idx), set()).add((c_idx, 1, syn_idx))
