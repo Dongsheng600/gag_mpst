@@ -23,6 +23,7 @@ class Sort:
     local_dependency: Optional[Set[Tuple[int, int]]] = None
     parent_rules: List[Rule] = field(default_factory=list)
     child_rules: List[Rule] = field(default_factory=list)
+    guards: Set[int] = field(default_factory=set)
     
     def __post_init__(self):
         inh_names = {a.name for a in self.inheritedAttributes}
@@ -79,8 +80,6 @@ class Rule:
     sources: Dict[str, Tuple[int, int]] = field(default_factory=dict)  # var -> (form_idx, attr_idx)
     # Targets: Synthesized attributes of the parent OR Inherited attributes of the children
     targets: Dict[str, List[Tuple[int, int]]] = field(default_factory=dict)  # var -> List[(form_idx, attr_idx)]
-    # Patterns (guards) are defined by Literal-typed inherited attributes in the parent form
-    guards: Set[int] = field(default_factory=set)
     # Types of variables
     var_types: Dict[str, AttributeType] = field(default_factory=dict)
     # Effective dependency graph: set of (inh_attr_index, syn_attr_index) of the parent form
@@ -95,7 +94,7 @@ class Rule:
         self.parent.sort.parent_rules.append(self)
         for i, attr in enumerate(self.parent.inheritedAttributes):
             if isinstance(attr.type, Literal):
-                self.guards.add(i)
+                self.parent.sort.guards.add(i)
         for child in self.children:
             child.sort.child_rules.append(self)
         self._map_variables()
@@ -166,7 +165,7 @@ class Rule:
         for child_rule in child_all_rules:
             is_possible = True
             # Check each inherited attribute of the child sort
-            for i in child_rule.guards:
+            for i in child_rule.parent.sort.guards:
                 guard_attr = child_rule.parent.inheritedAttributes[i]
                 # Get the variable name used for this inherited attribute in the child form
                 var_name = child.inheritedAttributes[i].name
