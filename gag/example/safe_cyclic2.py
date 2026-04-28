@@ -7,7 +7,7 @@ Constraint: All forms in all rules have disjoint inherited and synthesized varia
 
 sort S(ctrl:"1" | "2", i, j)<s, t>
 sort Bridge(x)<y>
-sort Const()<v: "1">
+sort Const()<v>
 sort Main()<>
 
 S(c1:"1", i_p, j_p)<s_p, t_p> <-
@@ -40,7 +40,7 @@ S = Sort("S", [
     Attribute("t", Primitive(any))
 ])
 Bridge = Sort("Bridge", [Attribute("x", Primitive(any))], [Attribute("y", Primitive(any))])
-Const = Sort("Const", [], [Attribute("v", Literal("1"))])
+Const = Sort("Const", [], [Attribute("v", Primitive(any))])
 Main = Sort("Main", [], [])
 
 # Rule S1: ctrl=1. Analysis assumes dependency i -> s.
@@ -78,4 +78,4 @@ MainRule = Rule(
 BridgeLeaf = Rule(Form(Bridge, [Attribute("x_leaf")], [Attribute("y_leaf")]), [])
 ConstLeaf = Rule(Form(Const, [], [Attribute("v_leaf")]), [])
 
-CyclicGAG = GAG([S, Bridge, Const, Main], [Form(Main, [], [])], [S1, S2, MainRule, BridgeLeaf, ConstLeaf])
+Cyclic2GAG = GAG([S, Bridge, Const, Main], [Form(Main, [], [])], [S1, S2, MainRule, BridgeLeaf, ConstLeaf])
