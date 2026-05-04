@@ -1,4 +1,4 @@
-from safe.gag.base import GAG
+from gag_mpst.gag.base import GAG
 from typing import Tuple, Set, Dict
 
 class StrongAcyclicChecker:

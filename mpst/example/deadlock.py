@@ -1,9 +1,9 @@
-from safe.mpst.base import (
+from gag_mpst.mpst.base import (
     GlobalGraph, Node, InputLabel, OutputLabel, Channel
 )
-from safe.gag.atype import Primitive
-from safe.mpst.CoherenceChecker import CoherenceChecker
-from safe.mpst.visualise import visualise_global_graph
+from gag_mpst.gag.atype import Primitive
+from gag_mpst.mpst.CoherenceChecker import CoherenceChecker
+from gag_mpst.mpst.visualise import visualise_global_graph
 from typing import Any
 
 # Payload type

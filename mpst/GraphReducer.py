@@ -1,7 +1,7 @@
 from __future__ import annotations
 import random
 from typing import List, Tuple, Optional
-from safe.mpst.base import (
+from gag_mpst.mpst.base import (
     GlobalGraph, Node, InputLabel, OutputLabel, 
     BranchingLabel, SelectionLabel, LabelOutputLabel
 )

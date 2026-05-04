@@ -1,9 +1,9 @@
 from __future__ import annotations
 from typing import List, Dict, Any
-from safe.gag.base import GAG, Rule
-from safe.mpst.base import GlobalGraph, LocalGraph, Node, InputLabel, OutputLabel, BranchingLabel, SelectionLabel, LabelOutputLabel
-from safe.mpst.CoherenceChecker import CoherenceChecker
-from safe.gagmpst.converter import GAGToMPSTConverter
+from gag_mpst.gag.base import GAG, Rule
+from gag_mpst.mpst.base import GlobalGraph, LocalGraph, Node, InputLabel, OutputLabel, BranchingLabel, SelectionLabel, LabelOutputLabel
+from gag_mpst.mpst.CoherenceChecker import CoherenceChecker
+from gag_mpst.gagmpst.converter import GAGToMPSTConverter
 
 class GAGVerifier:
     def __init__(self, gag: GAG):
@@ -24,7 +24,7 @@ class GAGVerifier:
 
     def verify_rule(self, rule: Rule, verbose: bool = False) -> bool:
         """Constructs a rule-level global graph and checks its coherence."""
-        participants = ["env", "self"] + [f"child{i}" for i in range(1, len(rule.children) + 1)]
+        participants = ["self"] + [f"child{i}" for i in range(1, len(rule.children) + 1)]
         gg = GlobalGraph(participants)
         
         # 1. Parent's Contribution (Rule Adapter + Child Adapter to talk to env)

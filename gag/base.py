@@ -1,5 +1,5 @@
 from __future__ import annotations
-from safe.gag.atype import *
+from gag_mpst.gag.atype import *
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Tuple, Set, Optional
 

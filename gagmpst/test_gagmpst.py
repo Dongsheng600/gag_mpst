@@ -1,13 +1,13 @@
 import unittest
 import os
-from safe.gag.example.fold import FoldGAG
-from safe.gagmpst.converter import GAGToMPSTConverter
-from safe.gagmpst.verifier import GAGVerifier
-from safe.gag.base import Sort, Attribute, Form, Rule, GAG
-from safe.gag.atype import Primitive, Literal
-from safe.mpst.base import BranchingLabel, SelectionLabel, InputLabel, OutputLabel
+from gag_mpst.gag.example.fold import FoldGAG
+from gag_mpst.gagmpst.converter import GAGToMPSTConverter
+from gag_mpst.gagmpst.verifier import GAGVerifier
+from gag_mpst.gag.base import Sort, Attribute, Form, Rule, GAG
+from gag_mpst.gag.atype import Primitive, Literal
+from gag_mpst.mpst.base import BranchingLabel, SelectionLabel, InputLabel, OutputLabel
 
-from safe.mpst.visualise import visualise_local_graph
+from gag_mpst.mpst.visualise import visualise_local_graph
 
 class TestGAGToMPST(unittest.TestCase):
     def test_fold_visualization(self):

@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Any, List, Tuple, Set, Dict, Optional, cast, Union
-from safe.mpst.base import (
+from gag_mpst.mpst.base import (
     GlobalGraph, Node, ActionLabel, InputLabel, OutputLabel, 
     BranchingLabel, SelectionLabel, LabelOutputLabel, Channel,
     CommunicationEdge

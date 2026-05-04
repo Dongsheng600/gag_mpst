@@ -1,5 +1,5 @@
 from graphviz import Digraph
-from safe.mpst.base import GlobalGraph, LocalGraph, Node, CommunicationEdge
+from gag_mpst.mpst.base import GlobalGraph, LocalGraph, Node, CommunicationEdge
 
 def visualise_global_graph(gg: GlobalGraph, filename: str = "global_graph", format: str = "png", view: bool = True):
     """

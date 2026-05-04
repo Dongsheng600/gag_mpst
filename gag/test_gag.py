@@ -1,7 +1,7 @@
 import unittest
-from safe.gag.atype import Primitive, Literal, UnionType, AttributeType
-from safe.gag.base import Attribute, Sort, Form, Rule, GAG
-from safe.gag.StrongAcyclicChecker import StrongAcyclicChecker
+from gag_mpst.gag.atype import Primitive, Literal, UnionType, AttributeType
+from gag_mpst.gag.base import Attribute, Sort, Form, Rule, GAG
+from gag_mpst.gag.StrongAcyclicChecker import StrongAcyclicChecker
 from typing import Any
 
 class TestAttributeType(unittest.TestCase):
@@ -106,7 +106,7 @@ class TestGAGLogic(unittest.TestCase):
         self.assertIn(self.RuleA2, reachable3)
 
     def test_effective_acyclicity_safe_cyclic(self):
-        from safe.gag.example.safe_cyclic import CyclicGAG
+        from gag_mpst.gag.example.safe_cyclic import CyclicGAG
         # The CyclicGAG in safe_cyclic.py is safe but not strongly acyclic
         self.assertTrue(CyclicGAG.is_effectively_acyclic)
         
@@ -114,7 +114,7 @@ class TestGAGLogic(unittest.TestCase):
         self.assertFalse(checker.is_strongly_acyclic())
 
     def test_effective_acyclicity_deadlock(self):
-        from safe.gag.example.safe_cyclic2 import Cyclic2GAG
+        from gag_mpst.gag.example.safe_cyclic2 import Cyclic2GAG
         # The CyclicGAG in safe_cyclic.py is safe but not strongly acyclic
         self.assertFalse(Cyclic2GAG.is_effectively_acyclic)
         

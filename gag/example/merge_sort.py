@@ -1,6 +1,6 @@
 from __future__ import annotations
-from safe.gag.atype import Primitive, Literal
-from safe.gag.base import Attribute, Sort, Form, Rule, GAG
+from gag_mpst.gag.atype import Primitive, Literal
+from gag_mpst.gag.base import Attribute, Sort, Form, Rule, GAG
 from typing import List, Any
 
 """

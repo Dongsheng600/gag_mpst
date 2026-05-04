@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, List, Set, Optional
-from safe.gag.atype import AttributeType
+from gag_mpst.gag.atype import AttributeType
 
 """
 Implementation of Local and Global Graphs for Multiparty Session Types (MPST).

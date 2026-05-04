@@ -1,12 +1,12 @@
 from __future__ import annotations
 from typing import Dict, List, Set, Tuple, Optional, Any
-from safe.gag.base import Sort, Rule, Form, GAG, Attribute
-from safe.mpst.base import (
+from gag_mpst.gag.base import Sort, Rule, Form, GAG, Attribute
+from gag_mpst.mpst.base import (
     LocalGraph, Node, Channel, 
     InputLabel, OutputLabel, 
     BranchingLabel, SelectionLabel, LabelOutputLabel
 )
-from safe.gag.atype import LiteralType, UnionType, PrimitiveType
+from gag_mpst.gag.atype import LiteralType, UnionType, PrimitiveType
 
 class GAGToMPSTConverter:
     def __init__(self, gag: GAG):
