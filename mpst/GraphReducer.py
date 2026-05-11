@@ -62,8 +62,9 @@ class GraphReducer:
                 new_node = Node(new_action)
                 new_node.graph = graph.components[p]
                 if label in node.successors:
-                    for succ in node.successors[label]:
-                        new_node.add_edge(succ)
+                    # The virtual label output preserves the selected
+                    # continuation; it is not constrained like a normal output.
+                    new_node.successors[None] = set(node.successors[label])
                 graph.components[p].nodes.add(new_node)
                 graph.components[p].nodes.remove(node)
                 return True

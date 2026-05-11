@@ -1,6 +1,6 @@
-from gag_mpst.gag.atype import *
-from gag_mpst.gag.base import *
 from typing import Callable, List
+from gag_mpst.gag.atype import Literal, Primitive
+from gag_mpst.gag.base import Attribute, Form, GAG, Guard, Rule, Sort
 
 '''
 sort Fold(
@@ -47,12 +47,12 @@ Fold(list, cons, nil)<result> <-
 	Take(list)<head, tail, state>
 
 // Receive what decides the guard first!
-Fold'(list, cons, nil, "NotEmpty")<result> <-
+state == "NotEmpty": Fold'(list, cons, nil, state)<result> <-
 	Fold'(tail, cons, nil, state)<result'>
 	Take(list)<head, tail, state>
 	Combine(head, cons, result')<result>
 
-Fold'(list, cons, nil, "Empty")<result> <-
+state == "Empty": Fold'(list, cons, nil, state)<result> <-
 	Nil(nil)<result>
 '''
 
@@ -141,7 +141,7 @@ FoldPrimeNotEmptyRule = Rule(
         Attribute("list"),
         Attribute("cons"),
         Attribute("nil"),
-        Attribute("state", Literal("NotEmpty"))
+        Attribute("state")
     ], [
         Attribute("result")
     ]), [
@@ -167,7 +167,8 @@ FoldPrimeNotEmptyRule = Rule(
         ], [
             Attribute("result")
         ])
-    ]
+    ],
+    guard=Guard.equals("state", Literal("NotEmpty"))
 )
 
 FoldPrimeEmptyRule = Rule(
@@ -175,7 +176,7 @@ FoldPrimeEmptyRule = Rule(
         Attribute("list"),
         Attribute("cons"),
         Attribute("nil"),
-        Attribute("state", Literal("Empty"))
+        Attribute("state")
     ], [
         Attribute("result")
     ]), [
@@ -184,7 +185,8 @@ FoldPrimeEmptyRule = Rule(
         ], [
             Attribute("result")
         ])
-    ]
+    ],
+    guard=Guard.equals("state", Literal("Empty"))
 )
 
 TakeRule = Rule(

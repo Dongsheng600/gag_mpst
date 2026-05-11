@@ -1,7 +1,6 @@
 from __future__ import annotations
-from typing import List, Dict, Any
 from gag_mpst.gag.base import GAG, Rule
-from gag_mpst.mpst.base import GlobalGraph, LocalGraph, Node, InputLabel, OutputLabel, BranchingLabel, SelectionLabel, LabelOutputLabel
+from gag_mpst.mpst.base import GlobalGraph, Node, InputLabel, OutputLabel
 from gag_mpst.mpst.CoherenceChecker import CoherenceChecker
 from gag_mpst.gagmpst.converter import GAGToMPSTConverter
 
@@ -24,7 +23,7 @@ class GAGVerifier:
 
     def verify_rule(self, rule: Rule, verbose: bool = False) -> bool:
         """Constructs a rule-level global graph and checks its coherence."""
-        participants = ["self"] + [f"child{i}" for i in range(1, len(rule.children) + 1)]
+        participants = ["env", "self"] + [f"child{i}" for i in range(1, len(rule.children) + 1)]
         gg = GlobalGraph(participants)
         
         # 1. Parent's Contribution (Rule Adapter + Child Adapter to talk to env)
@@ -32,16 +31,13 @@ class GAGVerifier:
         env_lg = gg.components["env"]
         
         # Parent's own attributes: receive from env, send to env
-        parent_child_adapter = self.converter.get_child_adapter(parent_lg, rule.parent.sort, "env", "self")
+        parent_child_adapter = self.converter.get_child_adapter(
+            parent_lg, rule.parent.sort, "env", "self", include_guards=False
+        )
         # DUAL nodes for env
         for i, node in parent_child_adapter["receive_inh_nodes"].items():
             # Parent receives from env -> env SENDS to parent
-            if isinstance(node.action, BranchingLabel):
-                # env selects
-                action = SelectionLabel(node.action.channel, node.action.labels)
-            else:
-                # env sends
-                action = OutputLabel(node.action.channel, node.action.payload)
+            action = OutputLabel(node.action.channel, node.action.payload)
             env_lg.add_node(Node(action))
             
         for i, node in parent_child_adapter["emit_syn_nodes"].items():
@@ -50,11 +46,18 @@ class GAGVerifier:
             env_lg.add_node(Node(action))
 
         # Rule Adapter nodes for self
-        rule_adapter = self.converter.get_rule_adapter(parent_lg, rule.parent.sort, rule)
+        rule_adapter = self.converter.get_rule_adapter(
+            parent_lg, rule.parent.sort, rule, include_child_guards=False
+        )
         # Add edges between Parent's Child Adapter and Rule Adapter
         self.converter.add_rule_adapter_edges(rule, rule_adapter, 
                                              parent_child_adapter["receive_inh_nodes"], 
                                              parent_child_adapter["emit_syn_nodes"])
+
+        if not rule.children:
+            for recv_node in parent_child_adapter["receive_inh_nodes"].values():
+                for emit_node in parent_child_adapter["emit_syn_nodes"].values():
+                    self.converter._add_dependency_edge(recv_node, emit_node)
 
         # 2. Children's Contribution (Child Adapters)
         for i, child in enumerate(rule.children, 1):
@@ -62,7 +65,9 @@ class GAGVerifier:
             child_lg = gg.components[p_name]
             
             # The child's parent is "self" from the perspective of the rule.
-            child_adapter = self.converter.get_child_adapter(child_lg, child.sort, "self", p_name)
+            child_adapter = self.converter.get_child_adapter(
+                child_lg, child.sort, "self", p_name, include_guards=False
+            )
             
             # 3. Abstract Dependency Injection (CONTRACT)
             effective_dep = set()

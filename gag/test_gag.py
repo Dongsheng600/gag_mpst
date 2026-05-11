@@ -1,6 +1,6 @@
 import unittest
 from gag_mpst.gag.atype import Primitive, Literal, UnionType, AttributeType
-from gag_mpst.gag.base import Attribute, Sort, Form, Rule, GAG
+from gag_mpst.gag.base import Attribute, Sort, Form, Guard, Rule, GAG
 from gag_mpst.gag.StrongAcyclicChecker import StrongAcyclicChecker
 from typing import Any
 
@@ -59,15 +59,17 @@ class TestGAGLogic(unittest.TestCase):
         
         # Rule A1: i="1" -> o depends on nothing (constant)
         self.RuleA1 = Rule(
-            Form(self.SortA, [Attribute("i", Literal("1"))], [Attribute("o")]),
-            [] # o is independent
+            Form(self.SortA, [Attribute("i")], [Attribute("o")]),
+            [], # o is independent
+            guard=Guard.equals("i", Literal("1"))
         )
         
         # Rule A2: i="2" -> o depends on i
         self.SortB = Sort("B", [Attribute("x", Primitive(int))], [Attribute("y", Primitive(int))])
         self.RuleA2 = Rule(
-            Form(self.SortA, [Attribute("i", Literal("2"))], [Attribute("o")]),
-            [Form(self.SortB, [Attribute("i")], [Attribute("o")])]
+            Form(self.SortA, [Attribute("i")], [Attribute("o")]),
+            [Form(self.SortB, [Attribute("i")], [Attribute("o")])],
+            guard=Guard.equals("i", Literal("2"))
         )
         self.RuleB = Rule(Form(self.SortB, [Attribute("x")], [Attribute("y")]), [])
 
@@ -75,18 +77,21 @@ class TestGAGLogic(unittest.TestCase):
         # 'i' comes from Parent.i which is Literal("2") in RuleA2
         self.assertEqual(self.RuleA2.var_types['i'], Literal("2"))
         self.assertEqual(self.RuleA2.var_types['o'], Primitive(int))
+        self.assertEqual(self.SortA.guards, {0})
 
     def test_reachability(self):
         # Test reachability of A's rules from a parent
         SortRoot = Sort("Root", [Attribute("v", Literal("1") | Literal("2"))], [])
         # RuleRoot: calls A with variable 'v' which has type Literal("1") in this rule
         RuleRoot1 = Rule(
-            Form(SortRoot, [Attribute("v", Literal("1"))], []),
-            [Form(self.SortA, [Attribute("v")], [Attribute("unused")])]
+            Form(SortRoot, [Attribute("v")], []),
+            [Form(self.SortA, [Attribute("v")], [Attribute("unused")])],
+            guard=Guard.equals("v", Literal("1"))
         )
         RuleRoot2 = Rule(
-            Form(SortRoot, [Attribute("v", Literal("2"))], []),
-            [Form(self.SortA, [Attribute("v")], [Attribute("unused")])]
+            Form(SortRoot, [Attribute("v")], []),
+            [Form(self.SortA, [Attribute("v")], [Attribute("unused")])],
+            guard=Guard.equals("v", Literal("2"))
         )
         RuleRoot3 = Rule(
             Form(SortRoot, [Attribute("v")], []),
@@ -104,6 +109,26 @@ class TestGAGLogic(unittest.TestCase):
         reachable3 = RuleRoot3.reachable_rules(1)
         self.assertIn(self.RuleA1, reachable3)
         self.assertIn(self.RuleA2, reachable3)
+
+    def test_invalid_guard_attribute_fails(self):
+        sort_a = Sort("GuardedA", [Attribute("i", Literal("1") | Literal("2"))], [])
+        with self.assertRaises(ValueError) as cm:
+            Rule(
+                Form(sort_a, [Attribute("i")], []),
+                [],
+                guard=Guard.equals("missing", Literal("1"))
+            )
+        self.assertIn("no inherited attribute named missing", str(cm.exception))
+
+    def test_incompatible_guard_value_fails(self):
+        sort_a = Sort("GuardedB", [Attribute("i", Literal("1") | Literal("2"))], [])
+        with self.assertRaises(ValueError) as cm:
+            Rule(
+                Form(sort_a, [Attribute("i")], []),
+                [],
+                guard=Guard.equals("i", Literal("3"))
+            )
+        self.assertIn("not compatible", str(cm.exception))
 
     def test_effective_acyclicity_safe_cyclic(self):
         from gag_mpst.gag.example.safe_cyclic import CyclicGAG

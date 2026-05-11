@@ -1,5 +1,5 @@
-from gag_mpst.gag.atype import *
-from gag_mpst.gag.base import *
+from gag_mpst.gag.atype import Literal, Primitive
+from gag_mpst.gag.base import Attribute, Form, GAG, Guard, Rule, Sort
 
 '''
 Example of a GAG that is NOT strongly acyclic but is SAFE.
@@ -10,12 +10,12 @@ sort Bridge(x)<y>
 sort Const()<v: "1">
 sort Main()<>
 
-S(c1:"1", i_p, j_p)<s_p, t_p> <-
+ctrl == "1": S(c1, i_p, j_p)<s_p, t_p> <-
     Bridge(i_p)<s_p>
     Const()<c0>
     Bridge(c0)<t_p>
 
-S(c2:"2", i_p, j_p)<s_p, t_p> <-
+ctrl == "2": S(c2, i_p, j_p)<s_p, t_p> <-
     Bridge(j_p)<t_p>
     Const()<c0>
     Bridge(c0)<s_p>
@@ -45,22 +45,24 @@ Main = Sort("Main", [], [])
 
 # Rule S1: ctrl=1. Analysis assumes dependency i -> s.
 S1 = Rule(
-    Form(S, [Attribute("c1", Literal("1")), Attribute("i_p"), Attribute("j_p")], [Attribute("s_p"), Attribute("t_p")]),
+    Form(S, [Attribute("c1"), Attribute("i_p"), Attribute("j_p")], [Attribute("s_p"), Attribute("t_p")]),
     [
         Form(Bridge, [Attribute("i_p")], [Attribute("s_p")]),
         Form(Const, [], [Attribute("c0")]),
         Form(Bridge, [Attribute("c0")], [Attribute("t_p")])
-    ]
+    ],
+    guard=Guard.equals("ctrl", Literal("1"))
 )
 
 # Rule S2: ctrl=2. Analysis assumes dependency j -> t.
 S2 = Rule(
-    Form(S, [Attribute("c2", Literal("2")), Attribute("i_p"), Attribute("j_p")], [Attribute("s_p"), Attribute("t_p")]),
+    Form(S, [Attribute("c2"), Attribute("i_p"), Attribute("j_p")], [Attribute("s_p"), Attribute("t_p")]),
     [
         Form(Bridge, [Attribute("j_p")], [Attribute("t_p")]),
         Form(Const, [], [Attribute("c0")]),
         Form(Bridge, [Attribute("c0")], [Attribute("s_p")])
-    ]
+    ],
+    guard=Guard.equals("ctrl", Literal("2"))
 )
 
 # Rule MainRule: Closes the cycle in analysis by linking s -> j and t -> i.

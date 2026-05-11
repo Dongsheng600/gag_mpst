@@ -103,11 +103,11 @@ class CoherenceChecker:
 
         for ch, nodes in by_channel.items():
             if len(nodes) > 2:
-                print(f"Linearity Violation: {len(nodes)} active on {ch.name} at {trace}")
+                if self.verbose: print(f"Linearity Violation: {len(nodes)} active on {ch.name} at {trace}")
                 return False
             if len(nodes) == 2:
                 if not self._can_reduce(nodes[0][1].action, nodes[1][1].action):
-                    print(f"Linearity Violation: mismatch on {ch.name} at {trace}")
+                    if self.verbose: print(f"Linearity Violation: mismatch on {ch.name} at {trace}")
                     return False
 
         # 2. Transitions
@@ -132,7 +132,7 @@ class CoherenceChecker:
                         next_states.append((new_state, f"{p} sel {action.channel.name}.{label}"))
 
         if not next_states:
-            print(f"Deadlock detected at trace: {' -> '.join(trace)}")
+            if self.verbose: print(f"Deadlock detected at trace: {' -> '.join(trace)}")
             return False
 
         for ns, label in next_states:
@@ -212,8 +212,10 @@ class CoherenceChecker:
             new_node = Node(new_action)
             new_node.graph = selection_node.graph
             if label in selection_node.successors:
-                for succ in selection_node.successors[label]:
-                    new_node.add_edge(succ)
+                # This is an internal reduction artefact: the selected label
+                # inherits the branch continuation, which may be any graph node
+                # or a parallel set of entry nodes.
+                new_node.successors[None] = set(selection_node.successors[label])
             self._lo_cache[key] = new_node
             self._lo_parents[id(new_node)] = selection_node
         return self._lo_cache[key]

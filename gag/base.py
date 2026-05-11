@@ -1,7 +1,13 @@
 from __future__ import annotations
-from gag_mpst.gag.atype import *
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Tuple, Set, Optional
+from gag_mpst.gag.atype import (
+    AttributeType,
+    LiteralType,
+    Primitive,
+    PrimitiveType,
+)
 
 @dataclass(frozen=True)
 class Attribute:
@@ -9,10 +15,83 @@ class Attribute:
     type: AttributeType = Primitive(Any)
     
     def __repr__(self):
-        if isinstance(self.type, Primitive) and self.type.type == Any:
+        if isinstance(self.type, PrimitiveType) and self.type.type == Any:
             return self.name
         else:
             return f"{self.name}:{self.type}"
+
+
+@dataclass(frozen=True)
+class Guard:
+    """
+    Guard for a production rule.
+
+    The report defines a guard as G=(p_g, g), where p_g is a subset of the
+    parent inherited attributes.  This implementation supports the typed proxy
+    subset used by the MPST translation: a conjunction of literal equalities
+    over inherited attributes.
+    """
+    equalities: Tuple[Tuple[str, AttributeType], ...] = ()
+
+    def __post_init__(self):
+        seen: Dict[str, AttributeType] = {}
+        normalised: List[Tuple[str, AttributeType]] = []
+        for attr_name, expected_type in self.equalities:
+            if not isinstance(attr_name, str):
+                raise TypeError("Guard attribute names must be strings")
+            if attr_name in seen and seen[attr_name] != expected_type:
+                raise ValueError(f"Conflicting guard constraints for attribute {attr_name}")
+            if attr_name in seen:
+                continue
+            seen[attr_name] = expected_type
+            normalised.append((attr_name, expected_type))
+        object.__setattr__(self, "equalities", tuple(sorted(normalised, key=lambda item: item[0])))
+
+    @classmethod
+    def true(cls) -> Guard:
+        return cls()
+
+    @classmethod
+    def equals(cls, attr_name: str, expected_type: AttributeType) -> Guard:
+        return cls(((attr_name, expected_type),))
+
+    @classmethod
+    def conjunction(cls, equalities: Mapping[str, AttributeType]) -> Guard:
+        return cls(tuple(equalities.items()))
+
+    def is_trivial(self) -> bool:
+        return not self.equalities
+
+    def attr_names(self) -> Set[str]:
+        return {attr_name for attr_name, _ in self.equalities}
+
+    def get(self, attr_name: str) -> Optional[AttributeType]:
+        for name, expected_type in self.equalities:
+            if name == attr_name:
+                return expected_type
+        return None
+
+    def matches_types(self, available_types: Mapping[str, AttributeType]) -> bool:
+        for attr_name, expected_type in self.equalities:
+            derived_type = available_types.get(attr_name)
+            if derived_type is not None and not (expected_type <= derived_type):
+                return False
+        return True
+
+    def label(self) -> str:
+        if self.is_trivial():
+            return "true"
+        return "|".join(
+            f"{attr_name}={expected_type.literal if isinstance(expected_type, LiteralType) else expected_type}"
+            for attr_name, expected_type in self.equalities
+        )
+
+    def __repr__(self):
+        if self.is_trivial():
+            return "true"
+        return " and ".join(
+            f"{attr_name} == {expected_type}" for attr_name, expected_type in self.equalities
+        )
 
 @dataclass
 class Sort:
@@ -39,6 +118,12 @@ class Sort:
                 for syn_idx in range(len(self.synthesizedAttributes)):
                     self.local_dependency.add((inh_idx, syn_idx))
 
+    def inherited_index(self, attr_name: str) -> int:
+        for idx, attr in enumerate(self.inheritedAttributes):
+            if attr.name == attr_name:
+                return idx
+        raise ValueError(f"Sort {self.name} has no inherited attribute named {attr_name}")
+
     def __repr__(self):
         prefix = "@" if self.is_external else ""
         return f'{prefix}{self.name}({", ".join(map(str, self.inheritedAttributes))})<{", ".join(map(str, self.synthesizedAttributes))}>'
@@ -64,7 +149,7 @@ class Form:
         #! Check if the attribute literal is compatible with the sort definition
         for i in range(len(self.inheritedAttributes)):
             # Note: A Literal type is compatible if it's <= the sort's attribute type
-            if isinstance(self.inheritedAttributes[i].type, Literal) and not (self.inheritedAttributes[i].type <= self.sort.inheritedAttributes[i].type):
+            if isinstance(self.inheritedAttributes[i].type, LiteralType) and not (self.inheritedAttributes[i].type <= self.sort.inheritedAttributes[i].type):
                 raise ValueError(f"Inherited attribute {self.inheritedAttributes[i].name} type {self.inheritedAttributes[i].type} does not match sort definition {self.sort.inheritedAttributes[i].type}")
 
     def __repr__(self):
@@ -75,6 +160,9 @@ class Form:
 class Rule:
     parent: Form
     children: List[Form]
+    # Guard G=(p_g,g).  In the proxy-node subset this is represented as a
+    # conjunction of literal equality checks over parent inherited attributes.
+    guard: Guard = field(default_factory=Guard.true)
     # Sources and Targets represent the data flow of attributes in the production rule
     # Sources: Inherited attributes of the parent OR Synthesized attributes of the children
     sources: Dict[str, Tuple[int, int]] = field(default_factory=dict)  # var -> (form_idx, attr_idx)
@@ -91,14 +179,38 @@ class Rule:
     def __post_init__(self):
         if self.parent.sort.is_external:
             raise ValueError(f"External sort {self.parent.sort.name} cannot be a parent in a production rule")
+
+        self._validate_guard()
         self.parent.sort.parent_rules.append(self)
-        for i, attr in enumerate(self.parent.inheritedAttributes):
-            if isinstance(attr.type, Literal):
-                self.parent.sort.guards.add(i)
+        for i in self.guard_indices():
+            self.parent.sort.guards.add(i)
         for child in self.children:
             child.sort.child_rules.append(self)
         self._map_variables()
         self._derive_attribute_types()
+
+    def guard_indices(self) -> Set[int]:
+        return {self.parent.sort.inherited_index(attr_name) for attr_name in self.guard.attr_names()}
+
+    def _validate_guard(self):
+        for attr_name, expected_type in self.guard.equalities:
+            attr_idx = self.parent.sort.inherited_index(attr_name)
+            sort_attr = self.parent.sort.inheritedAttributes[attr_idx]
+            form_attr = self.parent.inheritedAttributes[attr_idx]
+
+            if not isinstance(expected_type, LiteralType):
+                raise ValueError(f"Guard for {self.parent.sort.name}.{attr_name} must compare against a literal")
+            if not (expected_type <= sort_attr.type):
+                raise ValueError(
+                    f"Guard value {expected_type} is not compatible with "
+                    f"{self.parent.sort.name}.{attr_name}: {sort_attr.type}"
+                )
+            if not (isinstance(form_attr.type, PrimitiveType) and form_attr.type.type == Any):
+                if not (expected_type <= form_attr.type):
+                    raise ValueError(
+                        f"Guard value {expected_type} is not compatible with form attribute "
+                        f"{form_attr.name}: {form_attr.type}"
+                    )
 
     def _map_variables(self):
         # Parent inherited are sources
@@ -135,7 +247,7 @@ class Rule:
             for attr_idx in range(len(self.parent.synthesizedAttributes)):
                 sort_attr = self.parent.sort.synthesizedAttributes[attr_idx]
                 attr = self.parent.synthesizedAttributes[attr_idx]
-                self.var_types[attr.name] = attr.type
+                self.var_types[attr.name] = self._effective_attr_type(attr, sort_attr)
         # Initial types from sources
         for var, (form_idx, attr_idx) in self.sources.items():
             if form_idx == 0:
@@ -144,10 +256,22 @@ class Rule:
             else:
                 sort_attr = self.children[form_idx-1].sort.synthesizedAttributes[attr_idx]
                 attr = self.children[form_idx-1].synthesizedAttributes[attr_idx]
-            if not (isinstance(attr.type, Primitive) and attr.type.type == Any):
+            if not (isinstance(attr.type, PrimitiveType) and attr.type.type == Any):
                 self.var_types[var] = attr.type
             else:
                 self.var_types[var] = sort_attr.type #! This could be improved by further induction
+
+        # Guards refine the type of the corresponding parent inherited
+        # variables in this rule, which is what branch pruning consumes.
+        for attr_name, expected_type in self.guard.equalities:
+            attr_idx = self.parent.sort.inherited_index(attr_name)
+            var_name = self.parent.inheritedAttributes[attr_idx].name
+            self.var_types[var_name] = expected_type
+
+    def _effective_attr_type(self, attr: Attribute, sort_attr: Attribute) -> AttributeType:
+        if not (isinstance(attr.type, PrimitiveType) and attr.type.type == Any):
+            return attr.type
+        return sort_attr.type
 
     def reachable_rules(self, child_idx: int) -> List[Rule]:
         """
@@ -164,14 +288,14 @@ class Rule:
         
         for child_rule in child_all_rules:
             is_possible = True
-            # Check each inherited attribute of the child sort
-            for i in child_rule.parent.sort.guards:
-                guard_attr = child_rule.parent.inheritedAttributes[i]
+            # Check each explicit guard equality of the child's candidate rule.
+            for attr_name, expected_type in child_rule.guard.equalities:
+                i = child_rule.parent.sort.inherited_index(attr_name)
                 # Get the variable name used for this inherited attribute in the child form
                 var_name = child.inheritedAttributes[i].name
                 derived_type = self.var_types.get(var_name)
                 
-                if derived_type and not (guard_attr.type <= derived_type):
+                if derived_type and not (expected_type <= derived_type):
                     is_possible = False
                     break
             
@@ -181,7 +305,8 @@ class Rule:
         return reachable
         
     def __repr__(self):
-        return f'{self.parent} <- {", ".join(map(str, self.children))}'
+        guard = "" if self.guard.is_trivial() else f"{self.guard}: "
+        return f'{guard}{self.parent} <- {", ".join(map(str, self.children))}'
 
 @dataclass
 class GAG:
@@ -189,9 +314,31 @@ class GAG:
     interfaces: List[Form]
     rules: List[Rule]
     is_effectively_acyclic: bool = False
+    is_proxy_node_gag: bool = field(default=False, init=False)
+    proxy_errors: List[str] = field(default_factory=list, init=False)
 
     def __post_init__(self):
+        self.proxy_errors = self._proxy_node_gag_errors()
+        self.is_proxy_node_gag = not self.proxy_errors
         self.is_effectively_acyclic = self._compute_effective_dependencies()
+
+    def _proxy_node_gag_errors(self) -> List[str]:
+        errors: List[str] = []
+
+        for rule in self.rules:
+            for attr_name, expected_type in rule.guard.equalities:
+                if not isinstance(expected_type, LiteralType):
+                    errors.append(f"{rule.parent.sort.name}: guard {attr_name} is not a literal equality")
+
+        for sort in self.sorts:
+            if not sort.parent_rules:
+                continue
+            has_leaf = any(not rule.children for rule in sort.parent_rules)
+            has_non_leaf = any(rule.children for rule in sort.parent_rules)
+            if has_leaf and has_non_leaf:
+                errors.append(f"{sort.name}: mixes leaf and non-leaf production rules")
+
+        return errors
 
 
     def _compute_effective_dependencies(self) -> bool:
@@ -281,4 +428,3 @@ class GAG:
             if node not in visited:
                 if visit(node): return True
         return False
-

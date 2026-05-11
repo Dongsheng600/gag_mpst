@@ -1,11 +1,12 @@
 import unittest
 import os
 from gag_mpst.gag.example.fold import FoldGAG
+from gag_mpst.gag.example.merge_sort import MergeSortGAG
 from gag_mpst.gagmpst.converter import GAGToMPSTConverter
 from gag_mpst.gagmpst.verifier import GAGVerifier
-from gag_mpst.gag.base import Sort, Attribute, Form, Rule, GAG
+from gag_mpst.gag.base import Sort, Attribute, Form, Guard, Rule, GAG
 from gag_mpst.gag.atype import Primitive, Literal
-from gag_mpst.mpst.base import BranchingLabel, SelectionLabel, InputLabel, OutputLabel
+from gag_mpst.mpst.base import BranchingLabel, SelectionLabel, InputLabel, OutputLabel, LocalGraph
 
 from gag_mpst.mpst.visualise import visualise_local_graph
 
@@ -28,6 +29,51 @@ class TestGAGToMPST(unittest.TestCase):
         """Test that the FoldGAG example is verified as communication-safe."""
         verifier = GAGVerifier(FoldGAG)
         self.assertTrue(verifier.verify_all_rules(verbose=False))
+
+    def test_merge_sort_conversion_and_verification(self):
+        """Test conversion and rule-level verification for the merge sort example."""
+        converter = GAGToMPSTConverter(MergeSortGAG)
+        local_graphs = converter.convert()
+
+        self.assertTrue(MergeSortGAG.is_proxy_node_gag, MergeSortGAG.proxy_errors)
+        self.assertEqual(
+            set(local_graphs),
+            {
+                "MainSort",
+                "RecSort",
+                "RecSortBase",
+                "Merge_S",
+                "GetBlocks",
+                "Split",
+                "MergeF",
+                "DivideLeft",
+                "DivideRight",
+                "CheckThreshold",
+                "InitIndices",
+            },
+        )
+        self.assertTrue(all(local_graphs[sort_name].nodes for sort_name in local_graphs))
+
+        rec_sort_graph = local_graphs["RecSort"]
+        state_inputs = [
+            node for node in rec_sort_graph.nodes
+            if isinstance(node.action, InputLabel) and node.action.channel.name == "ch_state_pnt_to_self"
+        ]
+        state_branches = [
+            node for node in rec_sort_graph.nodes
+            if isinstance(node.action, BranchingLabel) and node.action.channel.name == "ch_state_pnt_to_self"
+        ]
+        guard_selections = [
+            node for node in rec_sort_graph.nodes
+            if isinstance(node.action, SelectionLabel) and node.action.channel.name == "ch_guard_RecSort_self_to_pnt"
+        ]
+
+        self.assertEqual(len(state_inputs), 1)
+        self.assertEqual(state_branches, [])
+        self.assertEqual(len(guard_selections), 1)
+        self.assertEqual(set(guard_selections[0].action.labels), {"state=Base", "state=Rec"})
+
+        self.assertTrue(GAGVerifier(MergeSortGAG).verify_all_rules(verbose=False))
 
     def test_deadlock_detection(self):
         """Test that a GAG with a simple deadlock is correctly identified."""
@@ -72,12 +118,14 @@ class TestGAGToMPST(unittest.TestCase):
         RuleWorker = Rule(Form(SortWorker, [Attribute("t")], [Attribute("d")]), [])
         
         RuleL1 = Rule(
-            Form(SortChoice, [Attribute("c", Literal("L1"))], [Attribute("r")]),
-            [Form(SortWorker, [Attribute("c")], [Attribute("r")])]
+            Form(SortChoice, [Attribute("c")], [Attribute("r")]),
+            [Form(SortWorker, [Attribute("c")], [Attribute("r")])],
+            guard=Guard.equals("ctrl", Literal("L1"))
         )
         RuleL2 = Rule(
-            Form(SortChoice, [Attribute("c", Literal("L2"))], [Attribute("r")]),
-            [Form(SortWorker, [Attribute("c")], [Attribute("r")])]
+            Form(SortChoice, [Attribute("c")], [Attribute("r")]),
+            [Form(SortWorker, [Attribute("c")], [Attribute("r")])],
+            guard=Guard.equals("ctrl", Literal("L2"))
         )
         
         SortRoot = Sort("Root", [], [Attribute("final")])
@@ -95,6 +143,62 @@ class TestGAGToMPST(unittest.TestCase):
         self.assertTrue(verifier.verify_rule(RuleRoot))
         self.assertTrue(verifier.verify_rule(RuleL1))
         self.assertTrue(verifier.verify_rule(RuleL2))
+
+    def test_guard_attribute_is_data_input_with_separate_selection(self):
+        """Guard literals are data inputs; the rule choice is a separate selection."""
+        SortChoice = Sort("ChoiceLG", [Attribute("ctrl", Literal("L1") | Literal("L2"))], [Attribute("res")])
+        RuleL1 = Rule(Form(SortChoice, [Attribute("c")], [Attribute("r")]), [], guard=Guard.equals("ctrl", Literal("L1")))
+        RuleL2 = Rule(Form(SortChoice, [Attribute("c")], [Attribute("r")]), [], guard=Guard.equals("ctrl", Literal("L2")))
+        gag = GAG([SortChoice], [], [RuleL1, RuleL2])
+
+        lg = GAGToMPSTConverter(gag).convert()["ChoiceLG"]
+        ctrl_inputs = [
+            node for node in lg.nodes
+            if isinstance(node.action, InputLabel) and node.action.channel.name == "ch_ctrl_pnt_to_self"
+        ]
+        ctrl_branches = [
+            node for node in lg.nodes
+            if isinstance(node.action, BranchingLabel) and node.action.channel.name == "ch_ctrl_pnt_to_self"
+        ]
+        guard_selections = [
+            node for node in lg.nodes
+            if isinstance(node.action, SelectionLabel) and node.action.channel.name == "ch_guard_ChoiceLG_self_to_pnt"
+        ]
+        emit_nodes = [
+            node for node in lg.nodes
+            if isinstance(node.action, OutputLabel) and node.action.channel.name == "ch_res_self_to_pnt"
+        ]
+
+        self.assertEqual(len(ctrl_inputs), 1)
+        self.assertEqual(ctrl_branches, [])
+        self.assertEqual(len(guard_selections), 1)
+        self.assertEqual(set(guard_selections[0].action.labels), {"ctrl=L1", "ctrl=L2"})
+        self.assertIn(guard_selections[0], ctrl_inputs[0].successors[None])
+        self.assertIn(emit_nodes[0], ctrl_inputs[0].successors[None])
+
+    def test_rule_adapter_receives_child_guard_choice(self):
+        """A parent sends child guard data normally and receives the child's guard choice separately."""
+        SortChoice = Sort("ChoiceChildLG", [Attribute("ctrl", Literal("L1") | Literal("L2"))], [Attribute("res")])
+        RuleL1 = Rule(Form(SortChoice, [Attribute("c")], [Attribute("r")]), [], guard=Guard.equals("ctrl", Literal("L1")))
+        RuleL2 = Rule(Form(SortChoice, [Attribute("c")], [Attribute("r")]), [], guard=Guard.equals("ctrl", Literal("L2")))
+        SortRoot = Sort("RootLG", [Attribute("ctrl", Literal("L1") | Literal("L2"))], [Attribute("res")])
+        RuleRoot = Rule(
+            Form(SortRoot, [Attribute("c")], [Attribute("r")]),
+            [Form(SortChoice, [Attribute("c")], [Attribute("r")])]
+        )
+        gag = GAG([SortChoice, SortRoot], [], [RuleL1, RuleL2, RuleRoot])
+
+        converter = GAGToMPSTConverter(gag)
+        adapter = converter.get_rule_adapter(LocalGraph("RootLG"), SortRoot, RuleRoot)
+
+        send_ctrl = adapter["dist_nodes"][(1, 0)]
+        receive_guard = adapter["guard_recv_nodes"][1]
+
+        self.assertIsInstance(send_ctrl.action, OutputLabel)
+        self.assertEqual(send_ctrl.action.channel.name, "ch_ctrl_self_to_child1")
+        self.assertIsInstance(receive_guard.action, BranchingLabel)
+        self.assertEqual(receive_guard.action.channel.name, "ch_guard_ChoiceChildLG_child1_to_self")
+        self.assertEqual(set(receive_guard.action.labels), {"ctrl=L1", "ctrl=L2"})
 
     def test_external_service_verification(self):
         """Test that external service with restricted dependency allows verification."""
