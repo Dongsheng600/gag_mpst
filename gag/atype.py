@@ -1,6 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Any
+from collections.abc import Callable as CallableOrigin
+from typing import Any, get_args, get_origin
 
 class AttributeTypeMeta(type):
     _all_types = {}
@@ -46,8 +47,9 @@ class AttributeType(metaclass=AttributeTypeMeta):
 @dataclass(eq=False)
 class PrimitiveType(AttributeType):
     type: Any
+
     def __repr__(self):
-        return str(self.type)
+        return _format_type(self.type)
 
 @dataclass(eq=False)
 class LiteralType(AttributeType):
@@ -69,7 +71,7 @@ class UnionType(AttributeType):
             self.types.add(type2)
     
     def __repr__(self):
-        return ' | '.join(map(str, self.types))
+        return " | ".join(sorted(map(str, self.types)))
     
     def __eq__(self, other: object):
         if(isinstance(other, UnionType)):
@@ -87,3 +89,38 @@ class UnionType(AttributeType):
 
 Literal = LiteralType
 Primitive = PrimitiveType
+
+
+def _format_type(value: Any) -> str:
+    """Return compact, stable type names for rule printing and graph labels."""
+    if value is Any or value is any:
+        return "Any"
+
+    if isinstance(value, AttributeType):
+        return repr(value)
+
+    origin = get_origin(value)
+    args = get_args(value)
+    if origin is not None:
+        origin_name = _format_type(origin)
+        if origin is CallableOrigin:
+            if not args:
+                return "Callable"
+            if len(args) == 2 and isinstance(args[0], list):
+                params = ", ".join(_format_type(arg) for arg in args[0])
+                return f"Callable[[{params}], {_format_type(args[1])}]"
+            params = ", ".join(_format_type(arg) for arg in args[:-1])
+            return f"Callable[[{params}], {_format_type(args[-1])}]"
+        if args:
+            return f"{origin_name}[{', '.join(_format_type(arg) for arg in args)}]"
+        return origin_name
+
+    if isinstance(value, type):
+        if value.__module__ == "builtins":
+            return value.__name__
+        return f"{value.__module__}.{value.__qualname__}"
+
+    name = getattr(value, "__name__", None)
+    if name:
+        return name
+    return str(value)

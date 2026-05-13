@@ -15,7 +15,7 @@ class Attribute:
     type: AttributeType = Primitive(Any)
     
     def __repr__(self):
-        if isinstance(self.type, PrimitiveType) and self.type.type == Any:
+        if isinstance(self.type, PrimitiveType) and self.type.type in (Any, any):
             return self.name
         else:
             return f"{self.name}:{self.type}"

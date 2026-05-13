@@ -57,21 +57,28 @@ def visualise_local_graph(lg: LocalGraph, filename: str = "local_graph", format:
     Visualises a single LocalGraph.
     """
     dot = Digraph(name=f"LocalGraph_{lg.participant}")
-    dot.attr(rankdir='TB')
+    dot.attr(rankdir="TB", splines="polyline", nodesep="0.35", ranksep="0.55")
+    dot.attr("node", shape="box", style="rounded,filled", fontname="Arial", fontsize="10", margin="0.08")
+    dot.attr("edge", fontname="Arial", fontsize="9", arrowsize="0.7")
 
     node_to_id = {}
-    for i, node in enumerate(lg.nodes):
+    ordered_nodes = _ordered_nodes(lg.nodes)
+    for i, node in enumerate(ordered_nodes):
         node_id = f"node_{i}"
         node_to_id[id(node)] = node_id
-        dot.node(node_id, label=str(node.action), shape='box')
+        dot.node(node_id, label=str(node.action), fillcolor="white")
 
-    for node in lg.nodes:
+    for node in ordered_nodes:
         src_id = node_to_id[id(node)]
         for label, successors in node.successors.items():
-            for target in successors:
+            for target in _ordered_nodes(successors):
                 tgt_id = node_to_id[id(target)]
                 dot.edge(src_id, tgt_id, label=label if label else "")
 
     dot.render(filename, format=format, cleanup=True, view=view)
     print(f"Local graph saved to {filename}.{format}")
     return dot
+
+
+def _ordered_nodes(nodes):
+    return sorted(nodes, key=lambda node: (str(node.action), id(node)))

@@ -20,11 +20,11 @@ class GAGToMPSTConverter:
     def get_channel(self, attr_name: str, sender: str, receiver: str) -> Channel:
         key = (attr_name, sender, receiver)
         if key not in self.channels:
-            self.channels[key] = Channel(f"ch_{attr_name}_{sender}_to_{receiver}")
+            self.channels[key] = Channel(f"{sender}->{receiver}:{attr_name}")
         return self.channels[key]
 
     def get_guard_channel(self, sort: Sort, sender: str, receiver: str) -> Channel:
-        return self.get_channel(f"guard_{sort.name}", sender, receiver)
+        return self.get_channel(f"guard({sort.name})", sender, receiver)
 
     def sort_has_guard_choice(self, sort: Sort) -> bool:
         return any(not rule.guard.is_trivial() for rule in sort.parent_rules)

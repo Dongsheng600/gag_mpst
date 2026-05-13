@@ -57,15 +57,15 @@ class TestGAGToMPST(unittest.TestCase):
         rec_sort_graph = local_graphs["RecSort"]
         state_inputs = [
             node for node in rec_sort_graph.nodes
-            if isinstance(node.action, InputLabel) and node.action.channel.name == "ch_state_pnt_to_self"
+            if isinstance(node.action, InputLabel) and node.action.channel.name == "pnt->self:state"
         ]
         state_branches = [
             node for node in rec_sort_graph.nodes
-            if isinstance(node.action, BranchingLabel) and node.action.channel.name == "ch_state_pnt_to_self"
+            if isinstance(node.action, BranchingLabel) and node.action.channel.name == "pnt->self:state"
         ]
         guard_selections = [
             node for node in rec_sort_graph.nodes
-            if isinstance(node.action, SelectionLabel) and node.action.channel.name == "ch_guard_RecSort_self_to_pnt"
+            if isinstance(node.action, SelectionLabel) and node.action.channel.name == "self->pnt:guard(RecSort)"
         ]
 
         self.assertEqual(len(state_inputs), 1)
@@ -154,19 +154,19 @@ class TestGAGToMPST(unittest.TestCase):
         lg = GAGToMPSTConverter(gag).convert()["ChoiceLG"]
         ctrl_inputs = [
             node for node in lg.nodes
-            if isinstance(node.action, InputLabel) and node.action.channel.name == "ch_ctrl_pnt_to_self"
+            if isinstance(node.action, InputLabel) and node.action.channel.name == "pnt->self:ctrl"
         ]
         ctrl_branches = [
             node for node in lg.nodes
-            if isinstance(node.action, BranchingLabel) and node.action.channel.name == "ch_ctrl_pnt_to_self"
+            if isinstance(node.action, BranchingLabel) and node.action.channel.name == "pnt->self:ctrl"
         ]
         guard_selections = [
             node for node in lg.nodes
-            if isinstance(node.action, SelectionLabel) and node.action.channel.name == "ch_guard_ChoiceLG_self_to_pnt"
+            if isinstance(node.action, SelectionLabel) and node.action.channel.name == "self->pnt:guard(ChoiceLG)"
         ]
         emit_nodes = [
             node for node in lg.nodes
-            if isinstance(node.action, OutputLabel) and node.action.channel.name == "ch_res_self_to_pnt"
+            if isinstance(node.action, OutputLabel) and node.action.channel.name == "self->pnt:res"
         ]
 
         self.assertEqual(len(ctrl_inputs), 1)
@@ -195,9 +195,9 @@ class TestGAGToMPST(unittest.TestCase):
         receive_guard = adapter["guard_recv_nodes"][1]
 
         self.assertIsInstance(send_ctrl.action, OutputLabel)
-        self.assertEqual(send_ctrl.action.channel.name, "ch_ctrl_self_to_child1")
+        self.assertEqual(send_ctrl.action.channel.name, "self->child1:ctrl")
         self.assertIsInstance(receive_guard.action, BranchingLabel)
-        self.assertEqual(receive_guard.action.channel.name, "ch_guard_ChoiceChildLG_child1_to_self")
+        self.assertEqual(receive_guard.action.channel.name, "child1->self:guard(ChoiceChildLG)")
         self.assertEqual(set(receive_guard.action.labels), {"ctrl=L1", "ctrl=L2"})
 
     def test_external_service_verification(self):
